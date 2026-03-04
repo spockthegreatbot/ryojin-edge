@@ -75,20 +75,31 @@ function MatchCard({ m }: { m: Match }) {
       >
         {/* Sport + time */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <span
-            style={{
-              fontSize: 11,
-              color: "#7c3aed",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: 1.5,
-              background: "rgba(124,58,237,0.15)",
-              padding: "3px 8px",
-              borderRadius: 6,
-            }}
-          >
-            {m.sport === "soccer" ? "⚽ EPL" : "🏀 NBA"}
-          </span>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span
+              style={{
+                fontSize: 11,
+                color: "#7c3aed",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 1.5,
+                background: "rgba(124,58,237,0.15)",
+                padding: "3px 8px",
+                borderRadius: 6,
+              }}
+            >
+              {m.sport === "soccer" ? `⚽ ${(m as Match & { league?: string }).league || "EPL"}` : "🏀 NBA"}
+            </span>
+            {(m as Match & { isLive?: boolean }).isLive ? (
+              <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 700, background: "rgba(34,197,94,0.12)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.8 }}>
+                ● LIVE
+              </span>
+            ) : (
+              <span style={{ fontSize: 10, color: "#6b7280", fontWeight: 600, background: "rgba(107,114,128,0.12)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.8 }}>
+                DEMO
+              </span>
+            )}
+          </div>
           <span style={{ fontSize: 12, color: "#6b7280" }}>🕐 {formatKickoff(m.commenceTime)} AEDT</span>
         </div>
 
