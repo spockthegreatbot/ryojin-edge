@@ -28,6 +28,7 @@ export default function NavBar() {
         {[
           { href: "/", label: "Dashboard" },
           { href: "/picks", label: "Picks 🎯" },
+          { href: "/parlays", label: "🎰 Parlays" },
           { href: "/tracker", label: "Tracker" },
           { href: "/stats", label: "📊 Stats" },
           { href: "/about", label: "🧠 How It Works" },

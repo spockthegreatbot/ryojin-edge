@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { BetSuggestion } from "@/lib/bet-analyzer";
 import { MatchData } from "@/lib/mock-data";
 import { getDb } from "@/lib/db";
+import { buildParlays } from "@/lib/parlays";
 
 interface MatchWithBets extends MatchData {
   bets: BetSuggestion[];
@@ -127,9 +128,21 @@ export async function GET(request: Request) {
   const lean = picks.filter((p) => p.tier === "✅ Lean").length;
   const marginal = picks.filter((p) => p.tier === "⚠️ Marginal").length;
 
+  // Build top 3 parlays for Gordon multi-leg execution
+  const topParlays = buildParlays(
+    matches.map((m) => ({
+      homeTeam: m.homeTeam,
+      awayTeam: m.awayTeam,
+      league: m.league,
+      commenceTime: m.commenceTime,
+      bets: m.bets ?? [],
+    }))
+  ).slice(0, 3);
+
   const payload = {
     generated: new Date().toISOString(),
     picks,
+    parlays: topParlays,
     summary: {
       total: picks.length,
       strong,
