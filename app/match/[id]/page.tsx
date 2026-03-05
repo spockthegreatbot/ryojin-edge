@@ -168,9 +168,22 @@ function NewsCard({ item }: { item: NewsItem }) {
 }
 
 export default function MatchPage({ params }: { params: { id: string } }) {
-  const m: MatchData | undefined = MOCK_MATCHES.find((x) => x.id === params.id);
+  const [m, setM] = useState<MatchData | undefined>(MOCK_MATCHES.find((x) => x.id === params.id));
   const [news, setNews] = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
+
+  useEffect(() => {
+    // If not found in mock data, fetch from live matches API
+    if (!m) {
+      fetch("/api/matches")
+        .then((r) => r.json())
+        .then((matches: MatchData[]) => {
+          const found = matches.find((x) => x.id === params.id);
+          if (found) setM(found);
+        })
+        .catch(() => {});
+    }
+  }, [params.id, m]);
 
   useEffect(() => {
     fetch(`/api/news/${params.id}`)
@@ -182,7 +195,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
   if (!m) {
     return (
       <main style={{ background: "#0a0a0f", minHeight: "100vh", padding: 40 }}>
-        <div style={{ color: "#6b7280" }}>Match not found.</div>
+        <div style={{ color: "#6b7280" }}>Loading match...</div>
       </main>
     );
   }

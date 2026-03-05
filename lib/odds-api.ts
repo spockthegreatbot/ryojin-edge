@@ -86,7 +86,9 @@ export async function getLiveMatches(): Promise<LiveMatch[]> {
     const events = result.value;
     const sportMeta = SPORTS[i];
 
-    events.slice(0, 5).forEach((event) => {
+    // Filter out events that have already started
+    const upcoming = events.filter((e) => new Date(e.commence_time) > new Date());
+    upcoming.slice(0, 5).forEach((event) => {
       const odds = extractOdds(event);
       matches.push({
         id: event.id,
