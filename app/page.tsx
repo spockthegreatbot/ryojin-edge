@@ -15,12 +15,20 @@ type Match = MatchData & {
 const EDGE_COLORS = { red: "#ef4444", yellow: "#eab308", green: "#22c55e" };
 
 function formatKickoff(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-AU", {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-AU", {
+    timeZone: "Australia/Sydney",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const time = d.toLocaleTimeString("en-AU", {
     timeZone: "Australia/Sydney",
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
   });
+  return { date, time };
 }
 
 function EdgeBadge({ score, color }: { score: number; color: keyof typeof EDGE_COLORS }) {
@@ -67,9 +75,9 @@ function MatchCard({ m }: { m: Match }) {
       <div
         style={{
           background: "#12121a",
-          borderRadius: 14,
+          borderRadius: 16,
           border: "1px solid rgba(255,255,255,0.07)",
-          padding: 14,
+          padding: "18px 16px",
           cursor: "pointer",
           transition: "border-color 0.2s, transform 0.1s",
         }}
@@ -107,7 +115,10 @@ function MatchCard({ m }: { m: Match }) {
               </span>
             )}
           </div>
-          <span style={{ fontSize: 12, color: "#6b7280" }}>🕐 {formatKickoff(m.commenceTime)} AEDT</span>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 13, color: "white", fontWeight: 600 }}>{formatKickoff(m.commenceTime).date}</div>
+            <div style={{ fontSize: 11, color: "#6b7280" }}>🕐 {formatKickoff(m.commenceTime).time} AEDT</div>
+          </div>
         </div>
 
         {/* Teams + Edge */}

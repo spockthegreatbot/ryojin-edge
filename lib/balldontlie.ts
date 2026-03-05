@@ -29,6 +29,7 @@ interface BDLGame {
 export interface NBAGame {
   id: number;
   date: string;
+  datetime?: string; // ISO string with tip-off time
   homeTeam: string;
   awayTeam: string;
 }
@@ -88,6 +89,7 @@ export async function getUpcomingNBAGames(dateFrom: string, dateTo: string): Pro
     return games.map((g) => ({
       id: g.id,
       date: g.date,
+      datetime: (g as BDLGame & { datetime?: string }).datetime ?? undefined,
       homeTeam: g.home_team.full_name,
       awayTeam: g.visitor_team.full_name,
     }));

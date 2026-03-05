@@ -4,13 +4,11 @@ import { calcEdgeScore } from "@/lib/edge-calculator";
 import { getLiveMatches } from "@/lib/odds-api";
 import { getStandings, getUpcomingMatchesRange, enrichMatch } from "@/lib/football-data";
 import { analyzeMatch } from "@/lib/bet-analyzer";
-import { getTeamId, getTeamPtsAvg, getRecentForm, getUpcomingNBAGames } from "@/lib/balldontlie";
+import { getUpcomingNBAGames, NBAGame } from "@/lib/balldontlie";
 import {
   getTeamStats,
   getFootballTeamId,
-  getNBATeamStats,
   LEAGUE,
-  NBA_SEASON,
 } from "@/lib/api-sports";
 
 // Extended MatchData with data source flags
@@ -201,116 +199,53 @@ export async function GET() {
     }));
   }
 
-  // --- NBA: BallDontLie primary + API-Sports fallback ---
-  for (const game of nbaGames.slice(0, 15)) {
-    let homeForm: string[] = [];
-    let awayForm: string[] = [];
-    let goalsAvgHome = 0;
-    let goalsAvgAway = 0;
-    let dataSourceApiSports = false;
+  // --- NBA: BallDontLie primary — parallel processing, no serial API chains ---
+  const nbaResults = await Promise.all(
+    nbaGames.slice(0, 15).map(async (game) => {
+      // Odds overlay (already fetched above)
+      const oddsMatch = oddsMatches.find(
+        om => om.sport === "nba" &&
+          teamsMatch(om.homeTeam, game.homeTeam) &&
+          teamsMatch(om.awayTeam, game.awayTeam)
+      );
 
-    try {
-      const [homeId, awayId] = await Promise.all([
-        getTeamId(game.homeTeam),
-        getTeamId(game.awayTeam),
-      ]);
-      const [homePts, awayPts, homeFormArr, awayFormArr] = await Promise.all([
-        homeId ? getTeamPtsAvg(homeId) : Promise.resolve(null),
-        awayId ? getTeamPtsAvg(awayId) : Promise.resolve(null),
-        homeId ? getRecentForm(homeId) : Promise.resolve([]),
-        awayId ? getRecentForm(awayId) : Promise.resolve([]),
-      ]);
-      homeForm = homeFormArr;
-      awayForm = awayFormArr;
-      goalsAvgHome = homePts ?? 0;
-      goalsAvgAway = awayPts ?? 0;
-    } catch { /* keep zeros */ }
+      // Use game.datetime for accurate tip-off time if available, fall back to date
+      const commenceTime = (game as NBAGame & { datetime?: string }).datetime ?? game.date;
 
-    // API-Sports Basketball fallback (or supplement) for team stats
-    // Try to get team IDs from API-Sports using team name search
-    // NBA teams in API-Sports use numeric IDs — skip ID lookup for now,
-    // only augment if BallDontLie returned zeros
-    if (goalsAvgHome === 0 || goalsAvgAway === 0) {
-      try {
-        // API-Sports Basketball team search
-        const apiKey = process.env.API_SPORTS_KEY ?? "";
-        if (apiKey) {
-          const [homeSearch, awaySearch] = await Promise.all([
-            fetch(`https://v1.basketball.api-sports.io/teams?name=${encodeURIComponent(game.homeTeam)}`, {
-              headers: { "x-apisports-key": apiKey },
-              next: { revalidate: 86400 },
-            }).then(r => r.json()).catch(() => null),
-            fetch(`https://v1.basketball.api-sports.io/teams?name=${encodeURIComponent(game.awayTeam)}`, {
-              headers: { "x-apisports-key": apiKey },
-              next: { revalidate: 86400 },
-            }).then(r => r.json()).catch(() => null),
-          ]);
-
-          const homeTeamId: number | null = homeSearch?.response?.[0]?.id ?? null;
-          const awayTeamId: number | null = awaySearch?.response?.[0]?.id ?? null;
-
-          const [homeNBAStats, awayNBAStats] = await Promise.all([
-            homeTeamId ? getNBATeamStats(homeTeamId, NBA_SEASON) : Promise.resolve(null),
-            awayTeamId ? getNBATeamStats(awayTeamId, NBA_SEASON) : Promise.resolve(null),
-          ]);
-
-          if (homeNBAStats && goalsAvgHome === 0) {
-            goalsAvgHome = homeNBAStats.ptsAvg;
-            dataSourceApiSports = true;
-          }
-          if (awayNBAStats && goalsAvgAway === 0) {
-            goalsAvgAway = awayNBAStats.ptsAvg;
-            dataSourceApiSports = true;
-          }
-        }
-      } catch { /* keep BallDontLie values */ }
-    }
-
-    // Try Odds API overlay for NBA
-    let homeOdds = 0;
-    let awayOdds = 0;
-    const oddsMatch = oddsMatches.find(
-      om => om.sport === "nba" &&
-        teamsMatch(om.homeTeam, game.homeTeam) &&
-        teamsMatch(om.awayTeam, game.awayTeam)
-    );
-    if (oddsMatch) {
-      homeOdds = oddsMatch.homeOdds;
-      awayOdds = oddsMatch.awayOdds;
-    }
-
-    results.push(applyEdge({
-      id: `bdl-${game.id}`,
-      sport: "nba",
-      league: "NBA",
-      homeTeam: game.homeTeam,
-      awayTeam: game.awayTeam,
-      commenceTime: game.date,
-      homeOdds,
-      awayOdds,
-      homeForm,
-      awayForm,
-      goalsAvgHome,
-      goalsAvgAway,
-      h2hHomeWins: 0,
-      h2hTotal: 0,
-      h2hDraws: 0,
-      cornersAvgHome: 0,
-      cornersAvgAway: 0,
-      cardsAvgHome: 0,
-      cardsAvgAway: 0,
-      xgHome: 0,
-      xgAway: 0,
-      bttsProb: 0,
-      cleanSheetHome: 0,
-      cleanSheetAway: 0,
-      firstHalfGoalsAvg: 0,
-      varLikelihood: 0,
-      props: [],
-      dataSourceApiSports,
-      dataSourceFootballData: false,
-    }));
-  }
+      return applyEdge({
+        id: `bdl-${game.id}`,
+        sport: "nba",
+        league: "NBA",
+        homeTeam: game.homeTeam,
+        awayTeam: game.awayTeam,
+        commenceTime,
+        homeOdds: oddsMatch?.homeOdds ?? 0,
+        awayOdds: oddsMatch?.awayOdds ?? 0,
+        homeForm: [],
+        awayForm: [],
+        goalsAvgHome: 0,
+        goalsAvgAway: 0,
+        h2hHomeWins: 0,
+        h2hTotal: 0,
+        h2hDraws: 0,
+        cornersAvgHome: 0,
+        cornersAvgAway: 0,
+        cardsAvgHome: 0,
+        cardsAvgAway: 0,
+        xgHome: 0,
+        xgAway: 0,
+        bttsProb: 0,
+        cleanSheetHome: 0,
+        cleanSheetAway: 0,
+        firstHalfGoalsAvg: 0,
+        varLikelihood: 0,
+        props: [],
+        dataSourceApiSports: false,
+        dataSourceFootballData: false,
+      });
+    })
+  );
+  results.push(...nbaResults);
 
   results.sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 
