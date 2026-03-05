@@ -27,6 +27,7 @@ export default function NavBar() {
       <div style={{ display: "flex", gap: 8 }}>
         {[
           { href: "/", label: "Dashboard" },
+          { href: "/picks", label: "Picks 🎯" },
           { href: "/tracker", label: "Tracker" },
         ].map(({ href, label }) => (
           <Link

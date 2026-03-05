@@ -168,6 +168,13 @@ function NewsCard({ item }: { item: NewsItem }) {
   );
 }
 
+function displayStat(value: number | string): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "number" && value === 0) return "—";
+  if (typeof value === "string" && (value === "0" || value === "0.0" || value === "0%")) return "—";
+  return typeof value === "number" ? value.toString() : value;
+}
+
 export default function MatchPage({ params }: { params: { id: string } }) {
   const [m, setM] = useState<MatchData | undefined>(MOCK_MATCHES.find((x) => x.id === params.id));
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -220,8 +227,8 @@ export default function MatchPage({ params }: { params: { id: string } }) {
         ["Avg Corners / Game", m.cornersAvgHome, m.cornersAvgAway],
         ["Avg Cards / Game", m.cardsAvgHome, m.cardsAvgAway],
         ["1st Half Goals Avg", m.firstHalfGoalsAvg, "—"],
-        ["Clean Sheet %", `${m.cleanSheetHome}%`, `${m.cleanSheetAway}%`],
-        ["VAR Likelihood", `${m.varLikelihood}%`, "—"],
+        ["Clean Sheet %", m.cleanSheetHome ? `${m.cleanSheetHome}%` : 0, m.cleanSheetAway ? `${m.cleanSheetAway}%` : 0],
+        ["VAR Likelihood", m.varLikelihood ? `${m.varLikelihood}%` : 0, "—"],
       ]
     : [["Avg Points / Game", m.goalsAvgHome, m.goalsAvgAway]];
 
@@ -464,10 +471,10 @@ export default function MatchPage({ params }: { params: { id: string } }) {
                   <tr key={String(label)} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                     <td style={{ padding: "10px 16px", color: "#6b7280" }}>{String(label)}</td>
                     <td style={{ padding: "10px 16px", textAlign: "center", color: "white", fontWeight: 600 }}>
-                      {typeof h === "number" ? h.toFixed(1) : h}
+                      {displayStat(typeof h === "number" ? parseFloat(h.toFixed(1)) : String(h))}
                     </td>
                     <td style={{ padding: "10px 16px", textAlign: "center", color: "white", fontWeight: 600 }}>
-                      {typeof a === "number" ? a.toFixed(1) : a}
+                      {displayStat(typeof a === "number" ? parseFloat(a.toFixed(1)) : String(a))}
                     </td>
                   </tr>
                 ))}
@@ -504,6 +511,17 @@ export default function MatchPage({ params }: { params: { id: string } }) {
             </Card>
           )}
         </Section>
+        {/* Data source note */}
+        <div style={{
+          marginTop: 16, padding: "10px 14px",
+          background: "rgba(255,255,255,0.02)",
+          borderRadius: 8, border: "1px solid rgba(255,255,255,0.04)",
+          fontSize: 11, color: "#374151", lineHeight: 1.6,
+        }}>
+          📡 <strong style={{ color: "#4b5563" }}>Data sources:</strong>{" "}
+          Odds — The Odds API · Soccer stats — football-data.org · NBA stats — BallDontLie ·
+          Stats showing &quot;—&quot; are not yet available for this fixture.
+        </div>
       </div>
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </main>

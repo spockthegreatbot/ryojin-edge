@@ -51,20 +51,35 @@ export interface LiveMatch {
   awayOdds: number;
   drawOdds?: number;
   totalLine?: number; // over/under line
+  // Multi-book edge detection
+  pinnacleHome?: number;
+  pinnacleAway?: number;
+  pinnacleDraw?: number;
+  bookCount: number;
   isLive: true;
 }
 
-function extractOdds(event: OddsEvent): { home: number; away: number; draw?: number; total?: number } {
-  // Prefer pinnacle, then draftkings, then first available
-  const preferred = ["pinnacle", "draftkings", "fanduel", "betmgm", "unibet", "betfair_ex_uk"];
-  const bookmaker = event.bookmakers.find((b) => preferred.includes(b.key)) ?? event.bookmakers[0];
-  if (!bookmaker) return { home: 2.0, away: 2.0 };
+interface ExtractedOdds {
+  home: number;
+  away: number;
+  draw?: number;
+  total?: number;
+  pinnacleHome?: number;
+  pinnacleAway?: number;
+  pinnacleDraw?: number;
+  bookCount: number;
+}
 
+function extractBookOdds(
+  bookmaker: OddsEvent["bookmakers"][0],
+  homeTeam: string,
+  awayTeam: string
+): { home: number; away: number; draw?: number; total?: number } {
   const h2h = bookmaker.markets.find((m) => m.key === "h2h");
   const totals = bookmaker.markets.find((m) => m.key === "totals");
 
-  const homeOutcome = h2h?.outcomes.find((o) => o.name === event.home_team);
-  const awayOutcome = h2h?.outcomes.find((o) => o.name === event.away_team);
+  const homeOutcome = h2h?.outcomes.find((o) => o.name === homeTeam);
+  const awayOutcome = h2h?.outcomes.find((o) => o.name === awayTeam);
   const drawOutcome = h2h?.outcomes.find((o) => o.name === "Draw");
   const overOutcome = totals?.outcomes.find((o) => o.name === "Over");
 
@@ -73,6 +88,38 @@ function extractOdds(event: OddsEvent): { home: number; away: number; draw?: num
     away: awayOutcome?.price ?? 2.0,
     draw: drawOutcome?.price,
     total: overOutcome?.point,
+  };
+}
+
+function extractOdds(event: OddsEvent): ExtractedOdds {
+  const bookCount = event.bookmakers.length;
+
+  // Separately extract Pinnacle odds
+  const pinnacleBook = event.bookmakers.find((b) => b.key === "pinnacle");
+  let pinnacleHome: number | undefined;
+  let pinnacleAway: number | undefined;
+  let pinnacleDraw: number | undefined;
+
+  if (pinnacleBook) {
+    const pOdds = extractBookOdds(pinnacleBook, event.home_team, event.away_team);
+    pinnacleHome = pOdds.home;
+    pinnacleAway = pOdds.away;
+    pinnacleDraw = pOdds.draw;
+  }
+
+  // Best available odds (prefer pinnacle for accuracy, then sharp books)
+  const preferred = ["pinnacle", "draftkings", "fanduel", "betmgm", "unibet", "betfair_ex_uk"];
+  const bookmaker = event.bookmakers.find((b) => preferred.includes(b.key)) ?? event.bookmakers[0];
+  if (!bookmaker) return { home: 2.0, away: 2.0, bookCount };
+
+  const main = extractBookOdds(bookmaker, event.home_team, event.away_team);
+
+  return {
+    ...main,
+    pinnacleHome,
+    pinnacleAway,
+    pinnacleDraw,
+    bookCount,
   };
 }
 
@@ -101,6 +148,10 @@ export async function getLiveMatches(): Promise<LiveMatch[]> {
         awayOdds: odds.away,
         drawOdds: odds.draw,
         totalLine: odds.total,
+        pinnacleHome: odds.pinnacleHome,
+        pinnacleAway: odds.pinnacleAway,
+        pinnacleDraw: odds.pinnacleDraw,
+        bookCount: odds.bookCount,
         isLive: true,
       });
     });
