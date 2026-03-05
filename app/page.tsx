@@ -4,7 +4,13 @@ import Link from "next/link";
 import { MatchData } from "@/lib/mock-data";
 import type { BetSuggestion } from "@/lib/bet-analyzer";
 
-type Match = MatchData & { score: number; color: "red" | "yellow" | "green"; bets?: BetSuggestion[] };
+type Match = MatchData & {
+  score: number;
+  color: "red" | "yellow" | "green";
+  bets?: BetSuggestion[];
+  dataSourceApiSports?: boolean;
+  dataSourceFootballData?: boolean;
+};
 
 const EDGE_COLORS = { red: "#ef4444", yellow: "#eab308", green: "#22c55e" };
 
@@ -176,6 +182,22 @@ function MatchCard({ m }: { m: Match }) {
                 <ConfBar pct={p.confidence} />
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Data source badges */}
+        {(m.dataSourceApiSports || m.dataSourceFootballData) && (
+          <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+            {m.dataSourceApiSports && (
+              <span style={{ fontSize: 10, color: "#4b5563", background: "rgba(75,85,99,0.1)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.3 }}>
+                📊 API-Sports
+              </span>
+            )}
+            {m.dataSourceFootballData && (
+              <span style={{ fontSize: 10, color: "#4b5563", background: "rgba(75,85,99,0.1)", padding: "2px 6px", borderRadius: 4, letterSpacing: 0.3 }}>
+                📅 football-data
+              </span>
+            )}
           </div>
         )}
       </div>

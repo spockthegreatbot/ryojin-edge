@@ -257,6 +257,50 @@ export function analyzeSoccer(match: {
     });
   }
 
+  // --- 9. Corners market (real data from API-Sports) ---
+  const cornersHome = match.cornersAvgHome ?? 0;
+  const cornersAway = match.cornersAvgAway ?? 0;
+  if (cornersHome > 0 && cornersAway > 0) {
+    const totalCornersAvg = cornersHome + cornersAway;
+    const line = 9.5; // EPL typical line
+    // Simple model: if avg is above line → lean over; below → lean under
+    const overProb = clamp(0.5 + (totalCornersAvg - line) * 0.04);
+    const marketCorners = 0.50; // market is typically 50/50 around line
+    const edgeCorners = overProb - marketCorners;
+    suggestions.push({
+      market: "Total Corners",
+      pick: `Over ${line}`,
+      confidence: Math.round(overProb * 100),
+      edge: edgeCorners,
+      modelProb: overProb,
+      marketProb: marketCorners,
+      value: edgeCorners >= 0.05,
+      tier: edgeTier(edgeCorners),
+      reasoning: `Combined corners avg: ${totalCornersAvg.toFixed(1)}/game (H: ${cornersHome.toFixed(1)}, A: ${cornersAway.toFixed(1)}). Line: ${line}.`,
+    });
+  }
+
+  // --- 10. Cards market (real data from API-Sports) ---
+  const cardsAvgHome = (match as { cardsAvgHome?: number }).cardsAvgHome ?? 0;
+  const cardsAvgAway = (match as { cardsAvgAway?: number }).cardsAvgAway ?? 0;
+  if (cardsAvgHome > 0) {
+    const totalCardsAvg = cardsAvgHome + cardsAvgAway;
+    const cardLine = 3.5; // typical total cards line
+    const cardOverProb = clamp(0.5 + (totalCardsAvg - cardLine) * 0.08);
+    const edgeCards = cardOverProb - 0.5;
+    suggestions.push({
+      market: "Total Cards",
+      pick: `Over ${cardLine}`,
+      confidence: Math.round(cardOverProb * 100),
+      edge: edgeCards,
+      modelProb: cardOverProb,
+      marketProb: 0.5,
+      value: edgeCards >= 0.05,
+      tier: edgeTier(edgeCards),
+      reasoning: `Yellow cards avg: ${cardsAvgHome.toFixed(1)}/game home, ${cardsAvgAway.toFixed(1)}/game away. Total: ${totalCardsAvg.toFixed(1)}.`,
+    });
+  }
+
   // Sort: value bets first, then by edge descending
   return suggestions.sort((a, b) => {
     if (a.value !== b.value) return a.value ? -1 : 1;
