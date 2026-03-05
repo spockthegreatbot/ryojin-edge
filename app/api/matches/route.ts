@@ -4,11 +4,13 @@ import { calcEdgeScore } from "@/lib/edge-calculator";
 import { getLiveMatches } from "@/lib/odds-api";
 import { getStandings, getUpcomingMatchesRange, enrichMatch } from "@/lib/football-data";
 import { analyzeMatch } from "@/lib/bet-analyzer";
-import { getUpcomingNBAGames, NBAGame } from "@/lib/balldontlie";
 import {
   getTeamStats,
   getFootballTeamId,
+  getUpcomingFixtures,
+  getNBAGames,
   LEAGUE,
+  SEASON,
 } from "@/lib/api-sports";
 import { teamEloFromPosition } from "@/lib/elo";
 import { getRefereeStats } from "@/lib/referees";
@@ -62,20 +64,160 @@ export async function GET() {
   const dateFrom = now.toISOString().split("T")[0];
   const dateTo = weekAhead.toISOString().split("T")[0];
 
+  // Build date array for next 7 days (for NBA parallel fetch)
+  const nbaDateRange = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now.getTime() + i * 86400000);
+    return d.toISOString().split("T")[0];
+  });
+
   // Fetch all primary data sources in parallel
-  const [plMatches, clMatches, plStandings, clStandings, nbaGames, oddsMatches] = await Promise.all([
+  const [plMatches, clMatches, plStandings, clStandings, eplFixtures, uclFixtures, nbaGamesRaw, oddsMatches] = await Promise.all([
     getUpcomingMatchesRange("PL", dateFrom, dateTo).catch(() => []),
     getUpcomingMatchesRange("CL", dateFrom, dateTo).catch(() => []),
     getStandings("PL").catch(() => []),
     getStandings("CL").catch(() => []),
-    getUpcomingNBAGames(dateFrom, dateTo).catch(() => []),
+    getUpcomingFixtures(LEAGUE.EPL, SEASON).catch(() => []),
+    getUpcomingFixtures(LEAGUE.UCL, SEASON).catch(() => []),
+    Promise.all(nbaDateRange.map(d => getNBAGames(d).catch(() => []))).then(all => all.flat()),
     getLiveMatches().catch(() => []),
   ]);
 
+  // Deduplicate NBA games by id
+  const nbaGamesMap = new Map<number, typeof nbaGamesRaw[number]>();
+  for (const g of nbaGamesRaw) nbaGamesMap.set(g.id, g);
+  const nbaGames = Array.from(nbaGamesMap.values());
+
   const results: MatchDataExtended[] = [];
 
-  // --- SOCCER: football-data.org primary + API-Sports for team stats ---
-  const soccerFixtures = [
+  // --- SOCCER: API-Sports primary (paid plan), football-data.org as fallback ---
+
+  // Check if API-Sports returned fixtures
+  const useApiSportsPrimary = eplFixtures.length > 0 || uclFixtures.length > 0;
+
+  if (useApiSportsPrimary) {
+    // API-Sports fixtures available — use as primary source
+    const allApiFixtures = [
+      ...eplFixtures.slice(0, 10).map(f => ({ f, comp: "PL" })),
+      ...uclFixtures.slice(0, 10).map(f => ({ f, comp: "CL" })),
+    ];
+
+    for (const { f, comp } of allApiFixtures) {
+      const standings = comp === "CL" ? clStandings : plStandings;
+      const leagueId = leagueIdForComp(comp);
+
+      let homeForm: string[] = [];
+      let awayForm: string[] = [];
+      let goalsAvgHome = 0;
+      let goalsAvgAway = 0;
+      const h2hHomeWins = 0;
+      const h2hTotal = 0;
+      const h2hDraws = 0;
+      let cornersAvgHome = 0;
+      let cornersAvgAway = 0;
+      let cardsAvgHome = 0;
+      let cardsAvgAway = 0;
+      let bttsProb = 0;
+      let cleanSheetHome = 0;
+      let cleanSheetAway = 0;
+
+      // API-Sports team stats
+      try {
+        const [homeId, awayId] = await Promise.all([
+          getFootballTeamId(f.homeTeam, leagueId),
+          getFootballTeamId(f.awayTeam, leagueId),
+        ]);
+
+        const [homeStats, awayStats] = await Promise.all([
+          homeId ? getTeamStats(homeId, leagueId, SEASON) : Promise.resolve(null),
+          awayId ? getTeamStats(awayId, leagueId, SEASON) : Promise.resolve(null),
+        ]);
+
+        if (homeStats) {
+          homeForm = homeStats.form.length > 0 ? homeStats.form : homeForm;
+          goalsAvgHome = homeStats.goalsForAvg > 0 ? homeStats.goalsForAvg : goalsAvgHome;
+          cornersAvgHome = homeStats.cornersAvg;
+          cardsAvgHome = homeStats.cardsAvg;
+          cleanSheetHome = homeStats.cleanSheetPct;
+          bttsProb = homeStats.bttsProb;
+        }
+
+        if (awayStats) {
+          awayForm = awayStats.form.length > 0 ? awayStats.form : awayForm;
+          goalsAvgAway = awayStats.goalsForAvg > 0 ? awayStats.goalsForAvg : goalsAvgAway;
+          cornersAvgAway = awayStats.cornersAvg;
+          cardsAvgAway = awayStats.cardsAvg;
+          cleanSheetAway = awayStats.cleanSheetPct;
+          if (homeStats) bttsProb = (homeStats.bttsProb + awayStats.bttsProb) / 2;
+        }
+      } catch { /* keep zeros */ }
+
+      // Odds overlay
+      let homeOdds = 0;
+      let awayOdds = 0;
+      let drawOdds: number | undefined;
+      const oddsMatch = oddsMatches.find(
+        om => om.sport === "soccer" &&
+          teamsMatch(om.homeTeam, f.homeTeam) &&
+          teamsMatch(om.awayTeam, f.awayTeam)
+      );
+      if (oddsMatch) {
+        homeOdds = oddsMatch.homeOdds;
+        awayOdds = oddsMatch.awayOdds;
+        drawOdds = oddsMatch.drawOdds;
+      }
+
+      // Elo from standings
+      const totalTeams = standings.length || 20;
+      const homeStanding = standings.find((s) => s.team.name === f.homeTeam);
+      const awayStanding = standings.find((s) => s.team.name === f.awayTeam);
+      const homeElo = homeStanding ? teamEloFromPosition(homeStanding.position, totalTeams) : 1500;
+      const awayElo = awayStanding ? teamEloFromPosition(awayStanding.position, totalTeams) : 1500;
+
+      // Referee stats
+      const refereeStats = f.referee ? getRefereeStats(f.referee) : null;
+      const varLikelihoodCalc = refereeStats ? Math.round(refereeStats.varInterventionsPerGame * 100) : 0;
+
+      results.push(applyEdge({
+        id: `apisports-${f.id}`,
+        sport: "soccer",
+        league: f.league,
+        homeTeam: f.homeTeam,
+        awayTeam: f.awayTeam,
+        commenceTime: f.date,
+        homeOdds,
+        awayOdds,
+        drawOdds,
+        homeForm,
+        awayForm,
+        goalsAvgHome,
+        goalsAvgAway,
+        h2hHomeWins,
+        h2hTotal,
+        h2hDraws,
+        cornersAvgHome,
+        cornersAvgAway,
+        cardsAvgHome,
+        cardsAvgAway,
+        xgHome: 0,
+        xgAway: 0,
+        bttsProb,
+        cleanSheetHome,
+        cleanSheetAway,
+        firstHalfGoalsAvg: 0,
+        varLikelihood: varLikelihoodCalc,
+        props: [],
+        dataSourceApiSports: true,
+        dataSourceFootballData: false,
+        homeElo,
+        awayElo,
+        referee: f.referee,
+        refereeStats,
+      }));
+    }
+  }
+
+  // Fallback: use football-data.org if API-Sports returned nothing
+  const soccerFixtures = useApiSportsPrimary ? [] : [
     ...plMatches.slice(0, 10).map(m => ({ match: m, comp: "PL", league: "Premier League" })),
     ...clMatches.slice(0, 10).map(m => ({ match: m, comp: "CL", league: "Champions League" })),
   ];
@@ -124,8 +266,8 @@ export async function GET() {
       ]);
 
       const [homeStats, awayStats] = await Promise.all([
-        homeId ? getTeamStats(homeId, leagueId, 2024) : Promise.resolve(null),
-        awayId ? getTeamStats(awayId, leagueId, 2024) : Promise.resolve(null),
+        homeId ? getTeamStats(homeId, leagueId, SEASON) : Promise.resolve(null),
+        awayId ? getTeamStats(awayId, leagueId, SEASON) : Promise.resolve(null),
       ]);
 
       if (homeStats) {
@@ -225,7 +367,7 @@ export async function GET() {
     }));
   }
 
-  // --- NBA: BallDontLie primary — parallel processing, no serial API chains ---
+  // --- NBA: API-Sports Basketball primary (next 7 days, pre-fetched above) ---
   const nbaResults = await Promise.all(
     nbaGames.slice(0, 15).map(async (game) => {
       // Odds overlay (already fetched above)
@@ -235,16 +377,13 @@ export async function GET() {
           teamsMatch(om.awayTeam, game.awayTeam)
       );
 
-      // Use game.datetime for accurate tip-off time if available, fall back to date
-      const commenceTime = (game as NBAGame & { datetime?: string }).datetime ?? game.date;
-
       return applyEdge({
-        id: `bdl-${game.id}`,
+        id: `basketball-${game.id}`,
         sport: "nba",
         league: "NBA",
         homeTeam: game.homeTeam,
         awayTeam: game.awayTeam,
-        commenceTime,
+        commenceTime: game.date,
         homeOdds: oddsMatch?.homeOdds ?? 0,
         awayOdds: oddsMatch?.awayOdds ?? 0,
         homeForm: [],
@@ -266,7 +405,7 @@ export async function GET() {
         firstHalfGoalsAvg: 0,
         varLikelihood: 0,
         props: [],
-        dataSourceApiSports: false,
+        dataSourceApiSports: true,
         dataSourceFootballData: false,
       });
     })

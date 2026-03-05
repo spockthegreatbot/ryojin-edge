@@ -24,8 +24,9 @@ export const LEAGUE = {
   UCL: 2,
 } as const;
 
+export const SEASON = 2025;
 export const NBA_LEAGUE = 12;
-export const NBA_SEASON = "2024-2025";
+export const NBA_SEASON = "2025-2026";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,9 @@ export interface ApiSportsFixture {
   awayTeam: string;
   homeTeamId: number;
   awayTeamId: number;
+  league: string;
+  referee: string | null;
+  venue: string | null;
 }
 
 export interface ApiSportsPrediction {
@@ -168,7 +172,7 @@ export async function getFootballTeamId(
 
   try {
     const encoded = encodeURIComponent(teamName);
-    const url = `${FOOTBALL_BASE}/teams?name=${encoded}&league=${leagueId}&season=2024`;
+    const url = `${FOOTBALL_BASE}/teams?name=${encoded}&league=${leagueId}&season=${SEASON}`;
     const res = await fetch(url, {
       headers: footballHeaders(),
       ...CACHE_24H,
@@ -219,12 +223,13 @@ export async function getFootballTeamId(
 export async function getUpcomingFixtures(
   leagueId: number,
   season: number,
-  next: number
 ): Promise<ApiSportsFixture[]> {
   if (!KEY) return [];
 
   try {
-    const url = `${FOOTBALL_BASE}/fixtures?league=${leagueId}&season=${season}&next=${next}`;
+    const today = new Date().toISOString().split("T")[0];
+    const next14 = new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0];
+    const url = `${FOOTBALL_BASE}/fixtures?league=${leagueId}&season=${season}&from=${today}&to=${next14}`;
     const res = await fetch(url, {
       headers: footballHeaders(),
       next: { revalidate: 3600 }, // 1h for fixtures
@@ -234,7 +239,8 @@ export async function getUpcomingFixtures(
 
     const json = await res.json();
     const items: Array<{
-      fixture: { id: number; date: string };
+      fixture: { id: number; date: string; referee: string | null; venue: { name: string | null } };
+      league: { name: string };
       teams: {
         home: { id: number; name: string };
         away: { id: number; name: string };
@@ -248,6 +254,9 @@ export async function getUpcomingFixtures(
       awayTeam: item.teams.away.name,
       homeTeamId: item.teams.home.id,
       awayTeamId: item.teams.away.id,
+      league: item.league.name,
+      referee: item.fixture.referee ?? null,
+      venue: item.fixture.venue?.name ?? null,
     }));
   } catch {
     return [];
@@ -345,17 +354,14 @@ export async function getNBATeamStats(
 }
 
 // ---------------------------------------------------------------------------
-// Basketball: getNBAGames
+// Basketball: getNBAGames (single date — call in parallel for multiple dates)
 // ---------------------------------------------------------------------------
 
-export async function getNBAGames(
-  dateFrom: string,
-  dateTo: string
-): Promise<NBAGame[]> {
+export async function getNBAGames(date: string): Promise<NBAGame[]> {
   if (!KEY) return [];
 
   try {
-    const url = `${BASKETBALL_BASE}/games?league=${NBA_LEAGUE}&season=${NBA_SEASON}&date=${dateFrom}`;
+    const url = `${BASKETBALL_BASE}/games?league=${NBA_LEAGUE}&season=${NBA_SEASON}&date=${date}`;
     const res = await fetch(url, {
       headers: basketballHeaders(),
       next: { revalidate: 3600 },
@@ -366,21 +372,24 @@ export async function getNBAGames(
     const json = await res.json();
     const items: Array<{
       id: number;
-      date: { start: string };
+      date: string;
       teams: {
         home: { name: string };
         away: { name: string };
       };
+      scores: {
+        home: { total: number | null };
+        away: { total: number | null };
+      };
+      status: { short: string };
     }> = json?.response ?? [];
 
+    // Only return upcoming (not started) games
     return items
-      .filter((g) => {
-        const d = g.date?.start?.split("T")[0] ?? "";
-        return d >= dateFrom && d <= dateTo;
-      })
+      .filter((g) => g.status?.short === "NS")
       .map((g) => ({
         id: g.id,
-        date: g.date.start,
+        date: g.date,
         homeTeam: g.teams.home.name,
         awayTeam: g.teams.away.name,
       }));
