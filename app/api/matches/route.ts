@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { MOCK_MATCHES, MatchData } from "@/lib/mock-data";
 import { calcEdgeScore } from "@/lib/edge-calculator";
 import { getLiveMatches } from "@/lib/odds-api";
+import { getStandings, getUpcomingMatches, enrichMatch } from "@/lib/football-data";
 
 // Default values for stats we can't source without API-Football yet
 const soccerDefaults = {
@@ -76,23 +77,63 @@ export async function GET() {
     const liveMatches = await getLiveMatches();
 
     if (liveMatches.length > 0) {
-      const enriched: MatchData[] = liveMatches.map((lm) => {
-        const defaults = lm.sport === "soccer" ? soccerDefaults : nbaDefaults;
-        return {
-          ...defaults,
-          id: lm.id,
-          sport: lm.sport,
-          league: lm.league,
-          homeTeam: lm.homeTeam,
-          awayTeam: lm.awayTeam,
-          commenceTime: lm.commenceTime,
-          homeOdds: lm.homeOdds,
-          awayOdds: lm.awayOdds,
-          drawOdds: lm.drawOdds,
-          isLive: true as unknown as undefined,
-          dataSource: "The Odds API" as unknown as undefined,
-        };
-      });
+      // Pre-fetch standings for soccer enrichment (1 call per competition)
+      const [plStandings, clStandings] = await Promise.all([
+        getStandings("PL"),
+        getStandings("CL"),
+      ]);
+
+      const enriched: MatchData[] = await Promise.all(
+        liveMatches.map(async (lm) => {
+          const defaults = lm.sport === "soccer" ? soccerDefaults : nbaDefaults;
+
+          // Try to enrich soccer matches with real form/stats from football-data.org
+          let soccerStats = {};
+          if (lm.sport === "soccer") {
+            try {
+              const compCode = lm.league === "Champions League" ? "CL" : "PL";
+              const standings = compCode === "CL" ? clStandings : plStandings;
+              const fdMatches = await getUpcomingMatches(compCode);
+              // Match by team name (fuzzy)
+              const normalize = (n: string) =>
+                n.toLowerCase().replace(/\b(fc|cf|united|city|athletic|club)\b/g, "").trim();
+              const fdMatch = fdMatches.find(
+                (m) =>
+                  normalize(m.homeTeam.name).includes(normalize(lm.homeTeam).split(" ")[0]) ||
+                  normalize(lm.homeTeam).includes(normalize(m.homeTeam.name).split(" ")[0])
+              );
+              if (fdMatch && standings.length > 0) {
+                const stats = await enrichMatch(fdMatch, standings);
+                soccerStats = {
+                  homeForm: stats.homeForm,
+                  awayForm: stats.awayForm,
+                  goalsAvgHome: stats.homeGoalsAvg,
+                  goalsAvgAway: stats.awayGoalsAvg,
+                  h2hHomeWins: stats.h2hHomeWins,
+                  h2hTotal: stats.h2hTotal,
+                  h2hDraws: stats.h2hDraws,
+                };
+              }
+            } catch { /* silent fallback */ }
+          }
+
+          return {
+            ...defaults,
+            ...soccerStats,
+            id: lm.id,
+            sport: lm.sport,
+            league: lm.league,
+            homeTeam: lm.homeTeam,
+            awayTeam: lm.awayTeam,
+            commenceTime: lm.commenceTime,
+            homeOdds: lm.homeOdds,
+            awayOdds: lm.awayOdds,
+            drawOdds: lm.drawOdds,
+            isLive: true as unknown as undefined,
+            dataSource: "The Odds API + football-data.org" as unknown as undefined,
+          };
+        })
+      );
 
       const matches = enriched.map(applyEdge);
       return NextResponse.json(matches, {
