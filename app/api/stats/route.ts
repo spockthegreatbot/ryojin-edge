@@ -55,7 +55,7 @@ export async function GET() {
     const sql = getDb();
 
     // Fetch everything in parallel
-    const [overallRows, bySport, byMarket, byTier, allResolved, recentRows] = await Promise.all([
+    const [overallRows, bySport, byMarket, byTier, allResolved, recentRows, clvRows] = await Promise.all([
       sql`
         SELECT
           COUNT(*)::int                                                                    AS total,
@@ -123,6 +123,12 @@ export async function GET() {
         FROM picks
         ORDER BY recorded_at DESC LIMIT 30
       ` as unknown as Promise<RawPick[]>,
+
+      // Feature 5: CLV stats
+      sql`
+        SELECT ROUND(AVG(clv), 2) as avg_clv, COUNT(*)::int as clv_count
+        FROM picks WHERE clv IS NOT NULL
+      `,
     ]);
 
     // ── Simulation: P&L per settled pick ──────────────────────────────────
@@ -191,6 +197,11 @@ export async function GET() {
       edge: p.edge,
     }));
 
+    // Feature 5: CLV
+    const clvData = (clvRows as { avg_clv: number | null; clv_count: number }[])[0];
+    const avgClv = clvData?.avg_clv ?? null;
+    const clvCount = clvData?.clv_count ?? 0;
+
     return NextResponse.json({
       overall: overallRows[0],
       bySport,
@@ -202,6 +213,8 @@ export async function GET() {
       roi,
       dailyPnl,
       monthlyPnl,
+      avgClv,
+      clvCount,
     }, { headers: NO_STORE });
 
   } catch (e) {

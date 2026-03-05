@@ -31,4 +31,51 @@ export async function initSchema() {
       UNIQUE(match_id, market, pick)
     )
   `;
+
+  // Feature 5: CLV tracking columns (safe to run multiple times)
+  try {
+    await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS opening_odds FLOAT`;
+    await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS closing_odds FLOAT`;
+    await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS clv FLOAT`;
+  } catch {
+    // Columns may already exist — ignore
+  }
+}
+
+/**
+ * Feature 5: Update closing odds + CLV for a pick.
+ * CLV = (opening_odds / closing_odds - 1) * 100
+ * Positive CLV = we got better odds than market closed at = real edge.
+ */
+export async function updateClosingOdds(
+  matchId: string,
+  market: string,
+  pick: string,
+  closingOdds: number
+): Promise<void> {
+  const sql = getDb();
+  // Fetch the opening_odds (the odds recorded when the pick was saved)
+  const rows = await sql`
+    SELECT id, odds, opening_odds FROM picks
+    WHERE match_id = ${matchId}
+      AND market = ${market}
+      AND pick = ${pick}
+    LIMIT 1
+  `;
+
+  if (!rows.length) return;
+
+  const row = rows[0] as { id: number; odds: number | null; opening_odds: number | null };
+  const openingOdds = row.opening_odds ?? row.odds; // fall back to recorded odds
+  const clv = openingOdds && closingOdds > 1
+    ? parseFloat(((openingOdds / closingOdds - 1) * 100).toFixed(2))
+    : null;
+
+  await sql`
+    UPDATE picks
+    SET closing_odds = ${closingOdds},
+        clv = ${clv},
+        opening_odds = COALESCE(opening_odds, odds)
+    WHERE id = ${row.id}
+  `;
 }

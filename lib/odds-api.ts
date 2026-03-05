@@ -57,6 +57,15 @@ export interface LiveMatch {
   pinnacleDraw?: number;
   bookCount: number;
   isLive: true;
+  // Best available odds across all bookmakers
+  bestOddsHome?: number;
+  bestOddsHomeBook?: string;
+  bestOddsAway?: number;
+  bestOddsAwayBook?: string;
+  bestOddsDraw?: number;
+  bestOddsDrawBook?: string;
+  // All bookmakers for comparison table
+  allBookOdds?: { book: string; home: number; away: number; draw?: number }[];
 }
 
 interface ExtractedOdds {
@@ -68,6 +77,13 @@ interface ExtractedOdds {
   pinnacleAway?: number;
   pinnacleDraw?: number;
   bookCount: number;
+  bestOddsHome?: number;
+  bestOddsHomeBook?: string;
+  bestOddsAway?: number;
+  bestOddsAwayBook?: string;
+  bestOddsDraw?: number;
+  bestOddsDrawBook?: string;
+  allBookOdds?: { book: string; home: number; away: number; draw?: number }[];
 }
 
 function extractBookOdds(
@@ -89,6 +105,30 @@ function extractBookOdds(
     draw: drawOutcome?.price,
     total: overOutcome?.point,
   };
+}
+
+// Display-friendly book names
+const BOOK_DISPLAY: Record<string, string> = {
+  pinnacle: "Pinnacle",
+  draftkings: "DraftKings",
+  fanduel: "FanDuel",
+  betmgm: "BetMGM",
+  unibet: "Unibet",
+  betfair_ex_uk: "Betfair",
+  bet365: "Bet365",
+  williamhill: "William Hill",
+  betway: "Betway",
+  ladbrokes_au: "Ladbrokes",
+  pointsbetau: "PointsBet",
+  tab: "TAB",
+  sportsbet: "Sportsbet",
+  neds: "Neds",
+  bluebet: "BlueBet",
+  betr: "Betr",
+};
+
+function bookDisplayName(key: string): string {
+  return BOOK_DISPLAY[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function extractOdds(event: OddsEvent): ExtractedOdds {
@@ -114,12 +154,41 @@ function extractOdds(event: OddsEvent): ExtractedOdds {
 
   const main = extractBookOdds(bookmaker, event.home_team, event.away_team);
 
+  // Track best odds across all bookmakers
+  let bestOddsHome = 0;
+  let bestOddsHomeBook = "";
+  let bestOddsAway = 0;
+  let bestOddsAwayBook = "";
+  let bestOddsDraw: number | undefined;
+  let bestOddsDrawBook: string | undefined;
+  const allBookOdds: { book: string; home: number; away: number; draw?: number }[] = [];
+
+  for (const bk of event.bookmakers) {
+    const bOdds = extractBookOdds(bk, event.home_team, event.away_team);
+    const displayName = bookDisplayName(bk.key);
+    allBookOdds.push({ book: displayName, home: bOdds.home, away: bOdds.away, draw: bOdds.draw });
+
+    if (bOdds.home > bestOddsHome) { bestOddsHome = bOdds.home; bestOddsHomeBook = displayName; }
+    if (bOdds.away > bestOddsAway) { bestOddsAway = bOdds.away; bestOddsAwayBook = displayName; }
+    if (bOdds.draw && (!bestOddsDraw || bOdds.draw > bestOddsDraw)) {
+      bestOddsDraw = bOdds.draw;
+      bestOddsDrawBook = displayName;
+    }
+  }
+
   return {
     ...main,
     pinnacleHome,
     pinnacleAway,
     pinnacleDraw,
     bookCount,
+    bestOddsHome: bestOddsHome || undefined,
+    bestOddsHomeBook: bestOddsHomeBook || undefined,
+    bestOddsAway: bestOddsAway || undefined,
+    bestOddsAwayBook: bestOddsAwayBook || undefined,
+    bestOddsDraw,
+    bestOddsDrawBook,
+    allBookOdds: allBookOdds.length > 0 ? allBookOdds : undefined,
   };
 }
 
@@ -159,6 +228,13 @@ export async function getLiveMatches(): Promise<LiveMatch[]> {
         pinnacleDraw: odds.pinnacleDraw,
         bookCount: odds.bookCount,
         isLive: true,
+        bestOddsHome: odds.bestOddsHome,
+        bestOddsHomeBook: odds.bestOddsHomeBook,
+        bestOddsAway: odds.bestOddsAway,
+        bestOddsAwayBook: odds.bestOddsAwayBook,
+        bestOddsDraw: odds.bestOddsDraw,
+        bestOddsDrawBook: odds.bestOddsDrawBook,
+        allBookOdds: odds.allBookOdds,
       });
     });
   });

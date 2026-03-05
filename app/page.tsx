@@ -4,12 +4,16 @@ import Link from "next/link";
 import { MatchData } from "@/lib/mock-data";
 import type { BetSuggestion } from "@/lib/bet-analyzer";
 
+import type { MatchWeather } from "@/lib/weather";
+
 type Match = MatchData & {
   score: number;
   color: "red" | "yellow" | "green";
   bets?: BetSuggestion[];
   dataSourceApiSports?: boolean;
   dataSourceFootballData?: boolean;
+  weather?: MatchWeather | null;
+  dataSource?: "xG" | "goals_avg";
 };
 
 const EDGE_COLORS = { red: "#ef4444", yellow: "#eab308", green: "#22c55e" };
@@ -207,8 +211,29 @@ function MatchCard({ m }: { m: Match }) {
           </div>
         ))}
 
-        {/* Footer: source badges + referee tag */}
+        {/* Footer: source badges + xG + weather + referee */}
         <div style={{ marginTop: "auto", paddingTop: 10, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          {/* xG badge */}
+          {m.dataSource === "xG" && m.xgHome > 0 && m.xgAway > 0 && (
+            <span style={{
+              fontSize: 9, fontWeight: 700,
+              color: "#7c3aed", background: "rgba(124,58,237,0.12)",
+              border: "1px solid rgba(124,58,237,0.25)",
+              padding: "1px 6px", borderRadius: 4,
+            }}>
+              📊 xG: {m.xgHome} | {m.xgAway}
+            </span>
+          )}
+          {/* Weather badge */}
+          {m.weather && (
+            <span style={{
+              fontSize: 9, fontWeight: 600,
+              color: "#6b7280", background: "rgba(107,114,128,0.1)",
+              padding: "1px 6px", borderRadius: 4,
+            }}>
+              {m.weather.icon} {m.weather.tempC}°C
+            </span>
+          )}
           {(m.dataSourceApiSports || m.dataSourceFootballData) && (
             <>
               {m.dataSourceApiSports && (

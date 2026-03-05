@@ -25,6 +25,10 @@ export interface BetSuggestion {
   kellySuggestion: string; // "2.3% of bankroll" or "No edge (Kelly = 0)"
   factors?: FactorBreakdown[];
   refereeNote?: string;    // "⚖️ M. Oliver: strict on cards, 0.28 penalties/game"
+  // Best book fields (Feature 3)
+  bestBook?: string;       // "Bet365", "BetWay", etc.
+  bestOdds?: number;       // Best available odds across all books
+  bestEdge?: number;       // Edge vs Pinnacle fair value at BEST odds
 }
 
 // ─── Referee stats shape (mirrors lib/referees.ts — kept loose to avoid circular) ─
@@ -37,6 +41,52 @@ interface RefereeStatsInput {
   varInterventionsPerGame: number;
   homeBias: number;
   notes: string;
+}
+
+// ─── Weather shape (loose to avoid circular) ─────────────────────────────────
+interface WeatherInput {
+  goalsImpact: number;
+  cornersImpact: number;
+  icon: string;
+  description: string;
+  tempC: number;
+  rainMm: number;
+  windKph: number;
+}
+
+// ─── Motivation model (Feature 4) ────────────────────────────────────────────
+interface MotivationFactors {
+  homeMotivation: number;  // 0.7 to 1.3 multiplier
+  awayMotivation: number;
+  notes: string[];
+}
+
+function calcMotivation(match: {
+  homeTablePos?: number;
+  awayTablePos?: number;
+  league?: string;
+}): MotivationFactors {
+  const notes: string[] = [];
+  let home = 1.0, away = 1.0;
+
+  if (match.homeTablePos) {
+    if (match.homeTablePos >= 17) { home *= 1.15; notes.push("Home fighting relegation ⚡"); }
+    else if (match.homeTablePos <= 4) { home *= 1.10; notes.push("Home in top-4 race ⚡"); }
+    else if (match.homeTablePos >= 8 && match.homeTablePos <= 14) { home *= 0.95; }
+  }
+  if (match.awayTablePos) {
+    if (match.awayTablePos >= 17) { away *= 1.15; notes.push("Away fighting relegation ⚡"); }
+    else if (match.awayTablePos <= 4) { away *= 1.10; notes.push("Away in top-4 race ⚡"); }
+    else if (match.awayTablePos >= 8 && match.awayTablePos <= 14) { away *= 0.95; }
+  }
+
+  // UCL knockout rounds → always high motivation
+  if (match.league?.toLowerCase().includes("champions")) {
+    home *= 1.1; away *= 1.1;
+    notes.push("UCL knockout — must-win pressure");
+  }
+
+  return { homeMotivation: home, awayMotivation: away, notes };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -176,6 +226,8 @@ export function analyzeSoccer(match: {
   h2hDraws: number;
   goalsAvgHome: number;
   goalsAvgAway: number;
+  xgHome?: number;
+  xgAway?: number;
   bttsProb: number;
   cleanSheetHome: number;
   cleanSheetAway: number;
@@ -185,6 +237,17 @@ export function analyzeSoccer(match: {
   awayElo?: number;
   referee?: string | null;
   refereeStats?: RefereeStatsInput | null;
+  weather?: WeatherInput | null;
+  homeTablePos?: number;
+  awayTablePos?: number;
+  league?: string;
+  // Best book odds (Feature 3)
+  bestOddsHome?: number;
+  bestOddsHomeBook?: string;
+  bestOddsAway?: number;
+  bestOddsAwayBook?: string;
+  bestOddsDraw?: number;
+  bestOddsDrawBook?: string;
 }): BetSuggestion[] {
   const suggestions: BetSuggestion[] = [];
 
@@ -197,8 +260,22 @@ export function analyzeSoccer(match: {
   const h2hDrawRate = match.h2hDraws / h2hTotal;
   const h2hAwayRate = 1 - h2hHomeRate - h2hDrawRate;
 
-  const lambdaHome = Math.max(0.3, match.goalsAvgHome || 1.4);
-  const lambdaAway = Math.max(0.3, match.goalsAvgAway || 1.1);
+  // Feature 1: Use xG if available, fall back to goals avg
+  const useXG = (match.xgHome ?? 0) > 0 && (match.xgAway ?? 0) > 0;
+  const xgNote = useXG ? "Using xG data (more accurate)" : "Using goals avg (xG unavailable)";
+
+  // Feature 2: Weather adjustment
+  const weatherGoalAdj = match.weather?.goalsImpact ?? 0;
+  const weatherCornersAdj = match.weather?.cornersImpact ?? 0;
+
+  // Feature 4: Motivation
+  const motivation = calcMotivation(match);
+
+  const rawLambdaHome = useXG ? (match.xgHome ?? 1.4) : (match.goalsAvgHome || 1.4);
+  const rawLambdaAway = useXG ? (match.xgAway ?? 1.1) : (match.goalsAvgAway || 1.1);
+
+  const lambdaHome = Math.max(0.3, rawLambdaHome * (1 + weatherGoalAdj) * motivation.homeMotivation);
+  const lambdaAway = Math.max(0.3, rawLambdaAway * (1 + weatherGoalAdj) * motivation.awayMotivation);
 
   // Elo win probabilities
   const homeElo = match.homeElo ?? 1500;
@@ -231,6 +308,20 @@ export function analyzeSoccer(match: {
     ? " High VAR risk."
     : "";
 
+  // Build motivation note string
+  const motivationNote = motivation.notes.length > 0 ? ` ${motivation.notes.join(". ")}.` : "";
+
+  // Build weather note
+  const weatherNote = match.weather
+    ? ` ${match.weather.icon} ${match.weather.description} (${match.weather.tempC}°C, ${(weatherGoalAdj * 100).toFixed(0)}% goals impact).`
+    : "";
+
+  // Best book edge calculation helper
+  function bestBookEdge(bestOdds: number | undefined, fairValue: number): number | undefined {
+    if (!bestOdds || bestOdds <= 1) return undefined;
+    return (1 / fairValue) > 0 ? (bestOdds * fairValue - 1) : undefined;
+  }
+
   // ── 1. Match Result: Home Win ──
   const modelHome = clamp(
     marketHome * 0.35 +
@@ -240,6 +331,7 @@ export function analyzeSoccer(match: {
     0.05 * 0.05 // home field bonus
   );
   const edgeHome = modelHome - marketHome;
+  const bestEdgeHome = bestBookEdge(match.bestOddsHome, modelHome);
   suggestions.push({
     market: "Match Result",
     pick: `${match.homeTeam} Win`,
@@ -250,10 +342,13 @@ export function analyzeSoccer(match: {
     odds: match.homeOdds,
     value: edgeHome >= 0.05,
     tier: edgeTier(edgeHome),
-    reasoning: `Form ${formAdv > 0 ? "favours home" : "against home"} (${match.homeForm?.slice(-3).join("") || "—"}). Elo: ${homeElo}/${awayElo} → ${Math.round(eloWinHome * 100)}% win prob. H2H: ${match.h2hHomeWins}/${h2hTotal}.${varNote}`,
+    reasoning: `Form ${formAdv > 0 ? "favours home" : "against home"} (${match.homeForm?.slice(-3).join("") || "—"}). Elo: ${homeElo}/${awayElo} → ${Math.round(eloWinHome * 100)}% win prob. H2H: ${match.h2hHomeWins}/${h2hTotal}.${varNote}${motivationNote}${weatherNote} ${xgNote}.`,
     kellySuggestion: formatKelly(modelHome, match.homeOdds),
     factors: makeFactors(formAdv * 0.5, (eloWinHome - 0.5) * 1.5, (h2hHomeRate - 0.33) * 1.2, edgeHome),
     refereeNote: refNote,
+    bestBook: match.bestOddsHomeBook,
+    bestOdds: match.bestOddsHome,
+    bestEdge: bestEdgeHome,
   });
 
   // ── 2. Match Result: Away Win ──
@@ -264,6 +359,7 @@ export function analyzeSoccer(match: {
     h2hAwayRate * 0.10
   );
   const edgeAway = modelAway - marketAway;
+  const bestEdgeAway = bestBookEdge(match.bestOddsAway, modelAway);
   suggestions.push({
     market: "Match Result",
     pick: `${match.awayTeam} Win`,
@@ -274,10 +370,13 @@ export function analyzeSoccer(match: {
     odds: match.awayOdds,
     value: edgeAway >= 0.05,
     tier: edgeTier(edgeAway),
-    reasoning: `Away form: ${match.awayForm?.slice(-3).join("") || "—"}. Elo: ${awayElo} → ${Math.round(eloWinAway * 100)}% win prob. H2H away wins: ${Math.round(h2hAwayRate * h2hTotal)}/${h2hTotal}.${varNote}`,
+    reasoning: `Away form: ${match.awayForm?.slice(-3).join("") || "—"}. Elo: ${awayElo} → ${Math.round(eloWinAway * 100)}% win prob. H2H away wins: ${Math.round(h2hAwayRate * h2hTotal)}/${h2hTotal}.${varNote}${motivationNote}${weatherNote}`,
     kellySuggestion: formatKelly(modelAway, match.awayOdds),
     factors: makeFactors((awayF - homeF) * 0.5, (eloWinAway - 0.5) * 1.5, (h2hAwayRate - 0.33) * 1.2, edgeAway),
     refereeNote: refNote,
+    bestBook: match.bestOddsAwayBook,
+    bestOdds: match.bestOddsAway,
+    bestEdge: bestEdgeAway,
   });
 
   // ── 3. Draw ──
@@ -291,6 +390,7 @@ export function analyzeSoccer(match: {
       (Math.abs(formAdv) < 0.15 ? 0.08 : 0.0)
     );
     const edgeDraw = modelDraw - marketDraw;
+    const bestEdgeDraw = bestBookEdge(match.bestOddsDraw, modelDraw);
     suggestions.push({
       market: "Match Result",
       pick: "Draw",
@@ -305,6 +405,9 @@ export function analyzeSoccer(match: {
       kellySuggestion: formatKelly(modelDraw, match.drawOdds),
       factors: makeFactors(-(Math.abs(formAdv)) * 0.3, -(Math.abs(eloWinHome - 0.5)) * 1.5, (h2hDrawRate - 0.25) * 1.5, edgeDraw),
       refereeNote: refNote,
+      bestBook: match.bestOddsDrawBook,
+      bestOdds: match.bestOddsDraw,
+      bestEdge: bestEdgeDraw,
     });
   }
 
@@ -321,7 +424,7 @@ export function analyzeSoccer(match: {
     marketProb: marketOver25,
     value: edgeOver25 >= 0.05,
     tier: edgeTier(edgeOver25),
-    reasoning: `Expected goals: ${lambdaHome.toFixed(1)} + ${lambdaAway.toFixed(1)} = ${(lambdaHome + lambdaAway).toFixed(1)}. Dixon-Coles Poisson model: ${Math.round(modelOver25 * 100)}% chance of 3+ goals.`,
+    reasoning: `Expected goals: ${lambdaHome.toFixed(2)} + ${lambdaAway.toFixed(2)} = ${(lambdaHome + lambdaAway).toFixed(2)}. Dixon-Coles Poisson: ${Math.round(modelOver25 * 100)}% chance of 3+ goals. ${xgNote}.${weatherNote}`,
     kellySuggestion: formatKelly(modelOver25, 1.85), // typical Over 2.5 odds
     factors: makeFactors((lambdaHome + lambdaAway - 2.5) * 0.2, (eloWinHome - 0.5) * 0.3, 0, edgeOver25),
   });
@@ -403,10 +506,13 @@ export function analyzeSoccer(match: {
   const cornersHome = match.cornersAvgHome ?? 0;
   const cornersAway = match.cornersAvgAway ?? 0;
   if (cornersHome > 0 && cornersAway > 0) {
-    const totalCornersAvg = cornersHome + cornersAway;
+    const totalCornersAvg = (cornersHome + cornersAway) * (1 + weatherCornersAdj);
     const line = 9.5;
     const overProb = clamp(0.5 + (totalCornersAvg - line) * 0.04);
     const edgeCorners = overProb - 0.50;
+    const cornersWeatherNote = match.weather && weatherCornersAdj !== 0
+      ? ` ${match.weather.icon} Weather adj: ${(weatherCornersAdj * 100).toFixed(0)}%.`
+      : "";
     suggestions.push({
       market: "Total Corners",
       pick: `Over ${line}`,
@@ -416,7 +522,7 @@ export function analyzeSoccer(match: {
       marketProb: 0.50,
       value: edgeCorners >= 0.05,
       tier: edgeTier(edgeCorners),
-      reasoning: `Combined corners avg: ${totalCornersAvg.toFixed(1)}/game (H: ${cornersHome.toFixed(1)}, A: ${cornersAway.toFixed(1)}). Line: ${line}.`,
+      reasoning: `Combined corners avg: ${totalCornersAvg.toFixed(1)}/game (H: ${cornersHome.toFixed(1)}, A: ${cornersAway.toFixed(1)}). Line: ${line}.${cornersWeatherNote}`,
       kellySuggestion: formatKelly(overProb, 1.90),
     });
   }

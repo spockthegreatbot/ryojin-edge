@@ -7,6 +7,7 @@ import { calcEdgeScore, buildPropReasoning, PropReasoning, EdgeResult } from "@/
 import { NewsItem } from "@/app/api/news/[matchId]/route";
 import { analyzeMatch, BetSuggestion, FactorBreakdown } from "@/lib/bet-analyzer";
 import { cardStyleLabel } from "@/lib/referees";
+import type { MatchWeather } from "@/lib/weather";
 
 const EDGE_COLORS = { red: "#ef4444", yellow: "#eab308", green: "#22c55e" };
 const FORM_COLORS: Record<string, string> = { W: "#22c55e", D: "#eab308", L: "#ef4444" };
@@ -401,6 +402,48 @@ export default function MatchPage({ params }: { params: { id: string } }) {
               </div>
             ))}
           </div>
+
+          {/* xG + Weather row */}
+          {(((m as MatchData & { dataSource?: string }).dataSource === "xG" && m.xgHome > 0 && m.xgAway > 0) || (m as MatchData & { weather?: MatchWeather | null }).weather) && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 14 }}>
+              {(m as MatchData & { dataSource?: string }).dataSource === "xG" && m.xgHome > 0 && (
+                <div style={{
+                  background: "rgba(124,58,237,0.1)",
+                  border: "1px solid rgba(124,58,237,0.25)",
+                  borderRadius: 8,
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  color: "#c4b5fd",
+                  fontWeight: 600,
+                }}>
+                  📊 xG: <span style={{ color: "#7c3aed" }}>{m.xgHome}</span> | <span style={{ color: "#7c3aed" }}>{m.xgAway}</span>
+                  <span style={{ fontSize: 10, color: "#6b7280", marginLeft: 8 }}>via Understat (last 10 matches)</span>
+                </div>
+              )}
+              {(() => {
+                const weather = (m as MatchData & { weather?: MatchWeather | null }).weather;
+                if (!weather) return null;
+                return (
+                  <div style={{
+                    background: "rgba(59,130,246,0.08)",
+                    border: "1px solid rgba(59,130,246,0.2)",
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    fontSize: 13,
+                    color: "#93c5fd",
+                    fontWeight: 600,
+                  }}>
+                    {weather.icon} {weather.description} — {weather.rainMm.toFixed(1)}mm expected | {weather.tempC}°C | {weather.windKph}km/h wind
+                    {weather.goalsImpact !== 0 && (
+                      <span style={{ color: weather.goalsImpact < 0 ? "#ef4444" : "#22c55e", marginLeft: 8, fontSize: 11 }}>
+                        {(weather.goalsImpact * 100).toFixed(0)}% goals impact
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </Card>
 
         {/* Bet Suggestions */}
@@ -423,6 +466,17 @@ export default function MatchPage({ params }: { params: { id: string } }) {
                     <div style={{ marginTop: 8, fontSize: 11, color: b.value ? "#22c55e" : "#4b5563" }}>
                       📊 Kelly: {b.kellySuggestion}
                     </div>
+                    {/* Best book recommendation */}
+                    {b.bestBook && b.bestOdds && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: "#eab308" }}>
+                        🏦 Best price: <strong>{b.bestBook}</strong> @ {b.bestOdds.toFixed(2)}
+                        {b.bestEdge !== undefined && (
+                          <span style={{ color: b.bestEdge > 0 ? "#22c55e" : "#ef4444", marginLeft: 6 }}>
+                            ({b.bestEdge > 0 ? "+" : ""}{(b.bestEdge * 100).toFixed(1)}% edge at best odds)
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {/* Referee note */}
                     {b.refereeNote && (
                       <div style={{ marginTop: 4, fontSize: 11, color: "#6b7280" }}>{b.refereeNote}</div>
@@ -452,6 +506,51 @@ export default function MatchPage({ params }: { params: { id: string } }) {
           </div>
           <AlgorithmExplainer bets={allBets} isSoccer={isSoccer} />
         </Section>
+
+        {/* ── Bookmaker Odds Comparison ── */}
+        {isSoccer && (() => {
+          const allBookOdds = (m as MatchData & { allBookOdds?: { book: string; home: number; away: number; draw?: number }[] }).allBookOdds;
+          if (!allBookOdds || allBookOdds.length === 0) return null;
+          const sorted = [...allBookOdds].sort((a, b) => b.home - a.home);
+          return (
+            <Section title="🏦 Bookmaker Odds Comparison">
+              <Card style={{ padding: "16px 0", overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                      <th style={{ textAlign: "left", padding: "8px 16px", color: "#6b7280", fontWeight: 600, fontSize: 11, textTransform: "uppercase" }}>Bookmaker</th>
+                      <th style={{ textAlign: "center", padding: "8px 10px", color: "#6b7280", fontWeight: 600, fontSize: 11 }}>{m.homeTeam.split(" ").pop()}</th>
+                      <th style={{ textAlign: "center", padding: "8px 10px", color: "#6b7280", fontWeight: 600, fontSize: 11 }}>Draw</th>
+                      <th style={{ textAlign: "center", padding: "8px 10px", color: "#6b7280", fontWeight: 600, fontSize: 11 }}>{m.awayTeam.split(" ").pop()}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.slice(0, 10).map((bk, i) => {
+                      const bestHome = Math.max(...allBookOdds.map(b => b.home));
+                      const bestAway = Math.max(...allBookOdds.map(b => b.away));
+                      const bestDraw = Math.max(...allBookOdds.filter(b => b.draw).map(b => b.draw ?? 0));
+                      return (
+                        <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ padding: "8px 16px", color: "#9ca3af", fontWeight: 600 }}>{bk.book}</td>
+                          <td style={{ textAlign: "center", padding: "8px 10px", color: bk.home === bestHome ? "#22c55e" : "white", fontWeight: bk.home === bestHome ? 700 : 400 }}>
+                            {bk.home.toFixed(2)}{bk.home === bestHome && <span style={{ fontSize: 9, marginLeft: 3 }}>★</span>}
+                          </td>
+                          <td style={{ textAlign: "center", padding: "8px 10px", color: bk.draw === bestDraw ? "#22c55e" : "#6b7280", fontWeight: bk.draw === bestDraw ? 700 : 400 }}>
+                            {bk.draw ? bk.draw.toFixed(2) : "—"}{bk.draw === bestDraw && bk.draw > 0 && <span style={{ fontSize: 9, marginLeft: 3 }}>★</span>}
+                          </td>
+                          <td style={{ textAlign: "center", padding: "8px 10px", color: bk.away === bestAway ? "#22c55e" : "white", fontWeight: bk.away === bestAway ? 700 : 400 }}>
+                            {bk.away.toFixed(2)}{bk.away === bestAway && <span style={{ fontSize: 9, marginLeft: 3 }}>★</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ padding: "8px 16px 0", fontSize: 10, color: "#374151" }}>★ Best available odds highlighted in green</div>
+              </Card>
+            </Section>
+          );
+        })()}
 
         {/* ── Referee Intelligence Section ── */}
         {m.refereeStats && m.referee && (

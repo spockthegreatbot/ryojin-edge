@@ -14,11 +14,14 @@ import {
 } from "@/lib/api-sports";
 import { teamEloFromPosition } from "@/lib/elo";
 import { getRefereeStats } from "@/lib/referees";
+import { getTeamXG } from "@/lib/understat";
+import { getMatchWeather } from "@/lib/weather";
 
 // Extended MatchData with data source flags
 export interface MatchDataExtended extends MatchData {
   dataSourceApiSports?: boolean;
   dataSourceFootballData?: boolean;
+  venue?: string;
 }
 
 function applyEdge(match: MatchDataExtended) {
@@ -121,6 +124,8 @@ export async function GET() {
       let cleanSheetAway = 0;
 
       // API-Sports team stats
+      let homeTablePos: number | undefined;
+      let awayTablePos: number | undefined;
       try {
         const [homeId, awayId] = await Promise.all([
           getFootballTeamId(f.homeTeam, leagueId),
@@ -151,6 +156,26 @@ export async function GET() {
         }
       } catch { /* keep zeros */ }
 
+      // Extract table positions from standings
+      const totalTeams = standings.length || 20;
+      const homeStanding = standings.find((s) => s.team.name === f.homeTeam);
+      const awayStanding = standings.find((s) => s.team.name === f.awayTeam);
+      if (homeStanding) homeTablePos = homeStanding.position;
+      if (awayStanding) awayTablePos = awayStanding.position;
+
+      // Feature 1: Fetch xG from understat in parallel
+      const [homeXG, awayXG] = await Promise.all([
+        getTeamXG(f.homeTeam).catch(() => null),
+        getTeamXG(f.awayTeam).catch(() => null),
+      ]);
+      const xgHome = homeXG?.xgFor ?? 0;
+      const xgAway = awayXG?.xgFor ?? 0;
+      const dataSource = (xgHome > 0 && xgAway > 0) ? "xG" as const : "goals_avg" as const;
+
+      // Feature 2: Fetch weather
+      const venue = (f as { venue?: string }).venue ?? "";
+      const weather = await getMatchWeather(venue, f.date).catch(() => null);
+
       // Odds overlay
       let homeOdds = 0;
       let awayOdds = 0;
@@ -167,9 +192,6 @@ export async function GET() {
       }
 
       // Elo from standings
-      const totalTeams = standings.length || 20;
-      const homeStanding = standings.find((s) => s.team.name === f.homeTeam);
-      const awayStanding = standings.find((s) => s.team.name === f.awayTeam);
       const homeElo = homeStanding ? teamEloFromPosition(homeStanding.position, totalTeams) : 1500;
       const awayElo = awayStanding ? teamEloFromPosition(awayStanding.position, totalTeams) : 1500;
 
@@ -198,8 +220,8 @@ export async function GET() {
         cornersAvgAway,
         cardsAvgHome,
         cardsAvgAway,
-        xgHome: 0,
-        xgAway: 0,
+        xgHome,
+        xgAway,
         bttsProb,
         cleanSheetHome,
         cleanSheetAway,
@@ -212,6 +234,18 @@ export async function GET() {
         awayElo,
         referee: f.referee,
         refereeStats,
+        weather,
+        homeTablePos,
+        awayTablePos,
+        dataSource,
+        // Feature 3: Best book odds
+        bestOddsHome: oddsMatch?.bestOddsHome,
+        bestOddsHomeBook: oddsMatch?.bestOddsHomeBook,
+        bestOddsAway: oddsMatch?.bestOddsAway,
+        bestOddsAwayBook: oddsMatch?.bestOddsAwayBook,
+        bestOddsDraw: oddsMatch?.bestOddsDraw,
+        bestOddsDrawBook: oddsMatch?.bestOddsDrawBook,
+        allBookOdds: oddsMatch?.allBookOdds,
       }));
     }
   }
@@ -243,6 +277,8 @@ export async function GET() {
     let cleanSheetAway = 0;
     let dataSourceFootballData = false;
     let dataSourceApiSports = false;
+    let homeTablePos: number | undefined;
+    let awayTablePos: number | undefined;
 
     try {
       if (standings.length > 0) {
@@ -257,6 +293,12 @@ export async function GET() {
         dataSourceFootballData = true;
       }
     } catch { /* keep zeros */ }
+
+    // Extract table positions from standings
+    const fdHomeStanding = standings.find((s) => s.team.id === match.homeTeam.id);
+    const fdAwayStanding = standings.find((s) => s.team.id === match.awayTeam.id);
+    if (fdHomeStanding) homeTablePos = fdHomeStanding.position;
+    if (fdAwayStanding) awayTablePos = fdAwayStanding.position;
 
     // API-Sports: fetch team IDs + stats in parallel
     try {
@@ -293,6 +335,18 @@ export async function GET() {
         dataSourceApiSports = true;
       }
     } catch { /* keep football-data values */ }
+
+    // Feature 1: Fetch xG from understat in parallel
+    const [homeXGFd, awayXGFd] = await Promise.all([
+      getTeamXG(match.homeTeam.name).catch(() => null),
+      getTeamXG(match.awayTeam.name).catch(() => null),
+    ]);
+    const xgHome = homeXGFd?.xgFor ?? 0;
+    const xgAway = awayXGFd?.xgFor ?? 0;
+    const dataSourceFd = (xgHome > 0 && xgAway > 0) ? "xG" as const : "goals_avg" as const;
+
+    // Feature 2: Fetch weather (no venue from football-data.org, skip)
+    const weather = null;
 
     // Try to find odds from Odds API
     let homeOdds = 0;
@@ -350,8 +404,8 @@ export async function GET() {
       cornersAvgAway,
       cardsAvgHome,
       cardsAvgAway,
-      xgHome: 0,
-      xgAway: 0,
+      xgHome,
+      xgAway,
       bttsProb,
       cleanSheetHome,
       cleanSheetAway,
@@ -364,6 +418,18 @@ export async function GET() {
       awayElo,
       referee: refName,
       refereeStats,
+      weather,
+      homeTablePos,
+      awayTablePos,
+      dataSource: dataSourceFd,
+      // Feature 3: Best book odds
+      bestOddsHome: oddsMatch?.bestOddsHome,
+      bestOddsHomeBook: oddsMatch?.bestOddsHomeBook,
+      bestOddsAway: oddsMatch?.bestOddsAway,
+      bestOddsAwayBook: oddsMatch?.bestOddsAwayBook,
+      bestOddsDraw: oddsMatch?.bestOddsDraw,
+      bestOddsDrawBook: oddsMatch?.bestOddsDrawBook,
+      allBookOdds: oddsMatch?.allBookOdds,
     }));
   }
 

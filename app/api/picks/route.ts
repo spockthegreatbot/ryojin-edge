@@ -103,13 +103,15 @@ export async function GET(request: Request) {
         await sql`
           INSERT INTO picks (
             match_id, home_team, away_team, league, sport, kickoff,
-            market, pick, edge, model_prob, market_prob, odds, tier, kelly
+            market, pick, edge, model_prob, market_prob, odds, tier, kelly,
+            opening_odds
           ) VALUES (
             ${pick.matchId}, ${pick.homeTeam}, ${pick.awayTeam},
             ${pick.league}, ${pick.sport}, ${pick.kickoff},
             ${pick.market}, ${pick.pick}, ${pick.edge},
             ${pick.modelProb ?? null}, ${pick.marketProb ?? null},
-            ${pick.odds ?? null}, ${pick.tier}, ${pick.kellySuggestion ?? null}
+            ${pick.odds ?? null}, ${pick.tier}, ${pick.kellySuggestion ?? null},
+            ${pick.odds ?? null}
           )
           ON CONFLICT (match_id, market, pick) DO NOTHING
         `;

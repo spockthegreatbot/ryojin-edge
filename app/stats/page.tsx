@@ -28,6 +28,8 @@ interface StatsData {
   recentPicks: RecentPick[];
   totalStaked: number; totalProfit: number; roi: number;
   dailyPnl: DayPnl[]; monthlyPnl: MonthPnl[];
+  avgClv?: number | null;
+  clvCount?: number;
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -283,6 +285,51 @@ export default function StatsPage() {
             )}
           </Card>
         </div>
+
+        {/* ── CLV card ── */}
+        {!loading && (data?.clvCount ?? 0) > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <Card>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+                    📈 Closing Line Value (CLV)
+                  </div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: (data?.avgClv ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
+                    {(data?.avgClv ?? 0) >= 0 ? "+" : ""}{data?.avgClv?.toFixed(2) ?? "0.00"}%
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
+                    Average across {data?.clvCount} picks with closing data
+                  </div>
+                </div>
+                <div style={{
+                  background: (data?.avgClv ?? 0) >= 0 ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
+                  border: `1px solid ${(data?.avgClv ?? 0) >= 0 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
+                  borderRadius: 12,
+                  padding: "12px 18px",
+                  maxWidth: 360,
+                  fontSize: 12,
+                  color: "#9ca3af",
+                  lineHeight: 1.6,
+                }}>
+                  💡 <strong style={{ color: "white" }}>What is CLV?</strong>{" "}
+                  Positive CLV means we consistently got better odds than the market closed at —
+                  the gold standard for proving a model has real edge, independent of short-term results.
+                  {(data?.avgClv ?? 0) > 0 && (
+                    <span style={{ color: "#22c55e", display: "block", marginTop: 6, fontWeight: 600 }}>
+                      ✅ Model is beating the market on price.
+                    </span>
+                  )}
+                  {(data?.avgClv ?? 0) < 0 && (
+                    <span style={{ color: "#ef4444", display: "block", marginTop: 6, fontWeight: 600 }}>
+                      ⚠️ Model is getting worse prices than closing.
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* ── Charts row 1: line + donut ────────────────────────────────── */}
         <div className="stats-grid-mid" style={{ marginBottom: 20 }}>

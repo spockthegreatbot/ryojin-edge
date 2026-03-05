@@ -35,6 +35,19 @@ export interface MatchData {
   awayElo?: number;
   referee?: string | null;
   refereeStats?: RefereeStat | null;
+  // Feature v3 fields
+  weather?: import("./weather").MatchWeather | null;
+  homeTablePos?: number;
+  awayTablePos?: number;
+  dataSource?: "xG" | "goals_avg";
+  // Best book odds
+  bestOddsHome?: number;
+  bestOddsHomeBook?: string;
+  bestOddsAway?: number;
+  bestOddsAwayBook?: string;
+  bestOddsDraw?: number;
+  bestOddsDrawBook?: string;
+  allBookOdds?: { book: string; home: number; away: number; draw?: number }[];
 }
 
 const T = () => Date.now();
