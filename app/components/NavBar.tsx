@@ -21,7 +21,7 @@ export default function NavBar() {
     >
       <Link href="/" style={{ textDecoration: "none" }}>
         <span style={{ fontWeight: 700, fontSize: 18, color: "white" }}>
-          🎯 Ryojin Edge
+          🏆 TopBet
         </span>
       </Link>
       <div style={{ display: "flex", gap: 8 }}>

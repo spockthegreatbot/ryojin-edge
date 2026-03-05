@@ -6,8 +6,8 @@ import NavBar from "./components/NavBar";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Ryojin Edge",
-  description: "Sports Prop Intelligence Dashboard",
+  title: "TopBet",
+  description: "Sports Intelligence & Value Betting Dashboard",
 };
 
 export default function RootLayout({

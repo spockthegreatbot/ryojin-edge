@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { MatchData } from "@/lib/mock-data";
 import { BetSuggestion } from "@/lib/bet-analyzer";
-import NavBar from "@/app/components/NavBar";
+
 
 interface MatchWithBets extends MatchData {
   bets?: BetSuggestion[];
@@ -54,7 +54,6 @@ function ValueBetCard({ bet }: { bet: ValueBet }) {
       borderRadius: 14,
       border: "1px solid rgba(34,197,94,0.2)",
       padding: "16px 18px",
-      marginBottom: 10,
     }}>
       {/* Match name + kickoff */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
@@ -172,8 +171,7 @@ export default function PicksPage() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0d0d14" }}>
-      <NavBar />
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "24px 16px" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px" }}>
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "white", marginBottom: 6 }}>
@@ -242,9 +240,15 @@ export default function PicksPage() {
                     {soccerBets.length} pick{soccerBets.length !== 1 ? "s" : ""}
                   </span>
                 </h2>
-                {soccerBets.map((bet, i) => (
-                  <ValueBetCard key={`soccer-${i}`} bet={bet} />
-                ))}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                  gap: 14,
+                }}>
+                  {soccerBets.map((bet, i) => (
+                    <ValueBetCard key={`soccer-${i}`} bet={bet} />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -264,9 +268,15 @@ export default function PicksPage() {
                     {nbaBets.length} pick{nbaBets.length !== 1 ? "s" : ""}
                   </span>
                 </h2>
-                {nbaBets.map((bet, i) => (
-                  <ValueBetCard key={`nba-${i}`} bet={bet} />
-                ))}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                  gap: 14,
+                }}>
+                  {nbaBets.map((bet, i) => (
+                    <ValueBetCard key={`nba-${i}`} bet={bet} />
+                  ))}
+                </div>
               </div>
             )}
 
