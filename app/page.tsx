@@ -244,7 +244,7 @@ export default function Home() {
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "white", margin: "0 0 4px" }}>
-            Today&apos;s Matches
+            Upcoming Matches — Next 7 Days
           </h1>
           <p style={{ color: "#6b7280", margin: 0, fontSize: 14 }}>
             Prop predictions updated every 5 mins
@@ -286,7 +286,7 @@ export default function Home() {
 
         {!loading && filtered.length === 0 && (
           <div style={{ textAlign: "center", color: "#4b5563", padding: "60px 0" }}>
-            No matches scheduled for this sport today.
+            No matches found for this sport in the next 7 days.
           </div>
         )}
       </div>

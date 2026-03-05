@@ -30,7 +30,7 @@ async function fetchEvents(sportKey: string): Promise<OddsEvent[]> {
   if (!apiKey) return [];
   try {
     const res = await fetch(
-      `${BASE}/sports/${sportKey}/odds?apiKey=${apiKey}&regions=us,uk,au&markets=h2h,totals&oddsFormat=decimal&daysFrom=3`,
+      `${BASE}/sports/${sportKey}/odds?apiKey=${apiKey}&regions=us,uk,au&markets=h2h,totals&oddsFormat=decimal&daysFrom=7`,
       { next: { revalidate: 600 } }
     );
     if (!res.ok) return [];
@@ -134,8 +134,14 @@ export async function getLiveMatches(): Promise<LiveMatch[]> {
     const sportMeta = SPORTS[i];
 
     // Filter out events that have already started
-    const upcoming = events.filter((e) => new Date(e.commence_time) > new Date());
-    upcoming.slice(0, 10).forEach((event) => {
+    // Show events starting within the next 7 days
+    const now = new Date();
+    const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const upcoming = events.filter((e) => {
+      const t = new Date(e.commence_time);
+      return t > now && t <= weekAhead;
+    });
+    upcoming.slice(0, 15).forEach((event) => {
       const odds = extractOdds(event);
       matches.push({
         id: event.id,
