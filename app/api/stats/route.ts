@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 const FLAT_STAKE = 10;
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
