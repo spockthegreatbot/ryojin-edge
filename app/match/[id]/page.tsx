@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MOCK_MATCHES, MatchData } from "@/lib/mock-data";
 import { calcEdgeScore, buildPropReasoning, PropReasoning, EdgeResult } from "@/lib/edge-calculator";
 import { NewsItem } from "@/app/api/news/[matchId]/route";
+import { analyzeMatch } from "@/lib/bet-analyzer";
 
 const EDGE_COLORS = { red: "#ef4444", yellow: "#eab308", green: "#22c55e" };
 const FORM_COLORS: Record<string, string> = { W: "#22c55e", D: "#eab308", L: "#ef4444" };
@@ -281,6 +282,53 @@ export default function MatchPage({ params }: { params: { id: string } }) {
             ))}
           </div>
         </Card>
+
+        {/* Bet Suggestions */}
+        {(() => {
+          const bets = analyzeMatch({ ...m });
+          const valueBets = bets.filter((b) => b.value);
+          const otherBets = bets.filter((b) => !b.value).slice(0, 3);
+          const allBets = [...valueBets, ...otherBets];
+          return (
+            <Section title="🎯 Betting Analysis">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {allBets.map((b, i) => (
+                  <Card key={i} style={{ padding: "14px 16px", border: b.value ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(255,255,255,0.07)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8 }}>{b.market}</span>
+                          {b.value && <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 700, background: "rgba(34,197,94,0.1)", padding: "1px 6px", borderRadius: 4 }}>VALUE BET</span>}
+                          <span style={{ fontSize: 11 }}>{b.tier}</span>
+                        </div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: b.value ? "#22c55e" : "white", marginBottom: 6 }}>{b.pick}</div>
+                        <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>{b.reasoning}</div>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, minWidth: 80 }}>
+                        {b.odds && <div style={{ fontSize: 18, fontWeight: 700, color: "#7c3aed" }}>{b.odds.toFixed(2)}</div>}
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{b.confidence}%</div>
+                        <div style={{ fontSize: 11, color: b.edge >= 0.05 ? "#22c55e" : b.edge >= 0 ? "#eab308" : "#ef4444" }}>
+                          {b.edge >= 0 ? "+" : ""}{(b.edge * 100).toFixed(1)}¢ edge
+                        </div>
+                      </div>
+                    </div>
+                    {/* Probability comparison bar */}
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#4b5563", marginBottom: 4 }}>
+                        <span>Model: {Math.round(b.modelProb * 100)}%</span>
+                        <span>Market: {Math.round(b.marketProb * 100)}%</span>
+                      </div>
+                      <div style={{ background: "#0a0a0f", borderRadius: 4, height: 6, position: "relative", overflow: "hidden" }}>
+                        <div style={{ background: "#7c3aed44", width: `${b.marketProb * 100}%`, height: "100%", position: "absolute" }} />
+                        <div style={{ background: b.value ? "#22c55e" : "#7c3aed", width: `${b.modelProb * 100}%`, height: "100%", borderRadius: 4, opacity: 0.8 }} />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Section>
+          );
+        })()}
 
         {/* Edge Reasoning */}
         <Section title="🧠 Edge Analysis">

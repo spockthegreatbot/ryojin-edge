@@ -2,8 +2,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MatchData } from "@/lib/mock-data";
+import type { BetSuggestion } from "@/lib/bet-analyzer";
 
-type Match = MatchData & { score: number; color: "red" | "yellow" | "green" };
+type Match = MatchData & { score: number; color: "red" | "yellow" | "green"; bets?: BetSuggestion[] };
 
 const EDGE_COLORS = { red: "#ef4444", yellow: "#eab308", green: "#22c55e" };
 
@@ -137,21 +138,46 @@ function MatchCard({ m }: { m: Match }) {
           ))}
         </div>
 
-        {/* Props */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {m.props.slice(0, 3).map((p) => (
-            <div key={p.label}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: "#6b7280" }}>{p.label}</span>
-                <span style={{ fontSize: 12, color: "white", fontWeight: 600 }}>
-                  {p.value}{" "}
-                  <span style={{ color: "#7c3aed" }}>{p.confidence}%</span>
-                </span>
-              </div>
-              <ConfBar pct={p.confidence} />
+        {/* Bet Suggestions */}
+        {m.bets && m.bets.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 10, color: "#4b5563", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 2 }}>
+              Top Picks
             </div>
-          ))}
-        </div>
+            {m.bets.slice(0, 3).map((b, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0a0a0f", borderRadius: 8, padding: "8px 10px", border: `1px solid ${b.value ? "rgba(34,197,94,0.2)" : "rgba(255,255,255,0.04)"}` }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 1 }}>{b.market}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: b.value ? "#22c55e" : "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {b.pick}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: 8 }}>
+                  {b.odds && <span style={{ fontSize: 12, color: "#7c3aed", fontWeight: 700 }}>{b.odds.toFixed(2)}</span>}
+                  <span style={{ fontSize: 11, fontWeight: 700, color: b.value ? "#22c55e" : "#6b7280", background: b.value ? "rgba(34,197,94,0.1)" : "rgba(107,114,128,0.1)", padding: "2px 6px", borderRadius: 4 }}>
+                    {b.confidence}%
+                  </span>
+                  <span style={{ fontSize: 10 }}>{b.tier.split(" ")[0]}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {m.props.slice(0, 3).map((p) => (
+              <div key={p.label}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>{p.label}</span>
+                  <span style={{ fontSize: 12, color: "white", fontWeight: 600 }}>
+                    {p.value}{" "}
+                    <span style={{ color: "#7c3aed" }}>{p.confidence}%</span>
+                  </span>
+                </div>
+                <ConfBar pct={p.confidence} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Link>
   );

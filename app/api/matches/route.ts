@@ -3,6 +3,7 @@ import { MOCK_MATCHES, MatchData } from "@/lib/mock-data";
 import { calcEdgeScore } from "@/lib/edge-calculator";
 import { getLiveMatches } from "@/lib/odds-api";
 import { getStandings, getUpcomingMatches, enrichMatch } from "@/lib/football-data";
+import { analyzeMatch } from "@/lib/bet-analyzer";
 
 // Default values for stats we can't source without API-Football yet
 const soccerDefaults = {
@@ -68,7 +69,8 @@ function applyEdge(match: MatchData) {
     homeTeam: match.homeTeam,
     awayTeam: match.awayTeam,
   });
-  return { ...match, ...edge };
+  const bets = analyzeMatch({ ...match });
+  return { ...match, ...edge, bets };
 }
 
 export async function GET() {
