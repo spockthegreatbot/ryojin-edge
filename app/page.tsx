@@ -61,9 +61,9 @@ function MatchCard({ m }: { m: Match }) {
       <div
         style={{
           background: "#12121a",
-          borderRadius: 16,
+          borderRadius: 14,
           border: "1px solid rgba(255,255,255,0.07)",
-          padding: 20,
+          padding: 14,
           cursor: "pointer",
           transition: "border-color 0.2s, transform 0.1s",
         }}
@@ -105,11 +105,11 @@ function MatchCard({ m }: { m: Match }) {
         </div>
 
         {/* Teams + Edge */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 17, color: "white", marginBottom: 2 }}>{m.homeTeam}</div>
-            <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 500 }}>vs</div>
-            <div style={{ fontWeight: 700, fontSize: 17, color: "#d1d5db", marginTop: 2 }}>{m.awayTeam}</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "white", marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.homeTeam}</div>
+            <div style={{ fontSize: 10, color: "#4b5563", fontWeight: 500 }}>vs</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#d1d5db", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.awayTeam}</div>
           </div>
           <EdgeBadge score={m.score} color={m.color} />
         </div>
@@ -233,8 +233,14 @@ export default function Home() {
 
   return (
     <main style={{ minHeight: "100vh", background: "#0a0a0f", padding: "24px 16px" }}>
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
-      <div style={{ maxWidth: 960, margin: "0 auto" }}>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .match-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        @media (max-width: 1200px) { .match-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 860px)  { .match-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 540px)  { .match-grid { grid-template-columns: 1fr; } }
+      `}</style>
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 26, fontWeight: 700, color: "white", margin: "0 0 4px" }}>
@@ -272,15 +278,9 @@ export default function Home() {
         </div>
 
         {/* Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(380px, 1fr))",
-            gap: 16,
-          }}
-        >
+        <div className="match-grid">
           {loading
-            ? Array(4).fill(null).map((_, i) => <SkeletonCard key={i} />)
+            ? Array(8).fill(null).map((_, i) => <SkeletonCard key={i} />)
             : filtered.map((m) => <MatchCard key={m.id} m={m} />)}
         </div>
 

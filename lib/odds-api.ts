@@ -88,7 +88,7 @@ export async function getLiveMatches(): Promise<LiveMatch[]> {
 
     // Filter out events that have already started
     const upcoming = events.filter((e) => new Date(e.commence_time) > new Date());
-    upcoming.slice(0, 5).forEach((event) => {
+    upcoming.slice(0, 10).forEach((event) => {
       const odds = extractOdds(event);
       matches.push({
         id: event.id,
