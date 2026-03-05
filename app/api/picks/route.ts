@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { BetSuggestion } from "@/lib/bet-analyzer";
 import { MatchData } from "@/lib/mock-data";
+import { getDb } from "@/lib/db";
 
 interface MatchWithBets extends MatchData {
   bets: BetSuggestion[];
 }
 
 interface Pick {
+  matchId: string;
+  homeTeam: string;
+  awayTeam: string;
   match: string;
   league: string;
   sport: string;
@@ -21,6 +25,7 @@ interface Pick {
   odds: number | null;
   tier: string;
   reasoning: string;
+  kellySuggestion: string | null;
 }
 
 const CORS_HEADERS = {
@@ -65,6 +70,9 @@ export async function GET(request: Request) {
       if (!bet.value) continue;
 
       picks.push({
+        matchId: match.id,
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
         match: matchLabel,
         league: match.league,
         sport: match.sport,
@@ -79,12 +87,38 @@ export async function GET(request: Request) {
         odds: bet.odds ?? null,
         tier: bet.tier,
         reasoning: bet.reasoning,
+        kellySuggestion: bet.kellySuggestion ?? null,
       });
     }
   }
 
   // Sort by edge descending — highest value first
   picks.sort((a, b) => b.edge - a.edge);
+
+  // ── Upsert picks to Neon DB (non-fatal) ──────────────────────────────────
+  if (process.env.DATABASE_URL) {
+    try {
+      const sql = getDb();
+      for (const pick of picks) {
+        await sql`
+          INSERT INTO picks (
+            match_id, home_team, away_team, league, sport, kickoff,
+            market, pick, edge, model_prob, market_prob, odds, tier, kelly
+          ) VALUES (
+            ${pick.matchId}, ${pick.homeTeam}, ${pick.awayTeam},
+            ${pick.league}, ${pick.sport}, ${pick.kickoff},
+            ${pick.market}, ${pick.pick}, ${pick.edge},
+            ${pick.modelProb ?? null}, ${pick.marketProb ?? null},
+            ${pick.odds ?? null}, ${pick.tier}, ${pick.kellySuggestion ?? null}
+          )
+          ON CONFLICT (match_id, market, pick) DO NOTHING
+        `;
+      }
+    } catch (e) {
+      // Non-fatal — don't break the picks endpoint if DB is down
+      console.error("DB upsert failed:", e);
+    }
+  }
 
   // Build summary
   const strong = picks.filter((p) => p.tier === "🔥 Strong").length;

@@ -29,6 +29,7 @@ export default function NavBar() {
           { href: "/", label: "Dashboard" },
           { href: "/picks", label: "Picks 🎯" },
           { href: "/tracker", label: "Tracker" },
+          { href: "/stats", label: "📊 Stats" },
         ].map(({ href, label }) => (
           <Link
             key={href}

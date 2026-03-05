@@ -260,6 +260,8 @@ export default function Home() {
   const [tab, setTab] = useState<"all" | "soccer" | "nba">("all");
   const [loading, setLoading] = useState(true);
   const [updated, setUpdated] = useState("");
+  const [winRate, setWinRate] = useState<number | null>(null);
+  const [trackedPicks, setTrackedPicks] = useState<number>(0);
 
   const fetchMatches = async () => {
     try {
@@ -273,10 +275,26 @@ export default function Home() {
     setLoading(false);
   };
 
+  // Fetch win-rate stats quietly (non-blocking)
+  const fetchStats = async () => {
+    try {
+      const r = await fetch("/api/stats");
+      if (!r.ok) return;
+      const d = await r.json();
+      const ov = d?.overall;
+      if (ov?.total > 0) setTrackedPicks(ov.total);
+      if (ov?.win_rate != null) setWinRate(ov.win_rate);
+    } catch {
+      // non-fatal
+    }
+  };
+
   useEffect(() => {
     fetchMatches();
+    fetchStats();
     const t = setInterval(fetchMatches, 300000);
-    return () => clearInterval(t);
+    const ts = setInterval(fetchStats, 600000);
+    return () => { clearInterval(t); clearInterval(ts); };
   }, []);
 
   // Stats
@@ -353,10 +371,10 @@ export default function Home() {
                   color: "#f97316",
                 },
                 {
-                  icon: "⚽",
-                  label: "Matches loaded",
-                  value: String(matches.length),
-                  color: "#7c3aed",
+                  icon: "📊",
+                  label: trackedPicks > 0 ? `${trackedPicks} tracked` : "Pick tracker",
+                  value: winRate != null ? `${winRate}%` : "Tracking…",
+                  color: winRate != null ? (winRate >= 50 ? "#22c55e" : "#ef4444") : "#4b5563",
                 },
                 {
                   icon: nextMatch ? "⏱" : "📅",
