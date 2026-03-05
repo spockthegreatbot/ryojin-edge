@@ -30,6 +30,7 @@ export default function NavBar() {
           { href: "/picks", label: "Picks 🎯" },
           { href: "/tracker", label: "Tracker" },
           { href: "/stats", label: "📊 Stats" },
+          { href: "/about", label: "🧠 How It Works" },
         ].map(({ href, label }) => (
           <Link
             key={href}

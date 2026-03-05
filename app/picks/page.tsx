@@ -3,6 +3,52 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { MatchData } from "@/lib/mock-data";
+
+// ── Collapsible "How are these scored?" ──────────────────────────────────────
+function HowScoredExplainer() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{
+      marginBottom: 20,
+      background: "#12121a",
+      borderRadius: 12,
+      border: "1px solid rgba(124,58,237,0.2)",
+      overflow: "hidden",
+    }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px", background: "none", border: "none",
+          cursor: "pointer", textAlign: "left",
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#7c3aed" }}>
+          🧠 How are these scored?
+        </span>
+        <span style={{ fontSize: 16, color: "#4b5563", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
+      </button>
+      {open && (
+        <div style={{
+          padding: "0 16px 14px",
+          borderTop: "1px solid rgba(124,58,237,0.12)",
+        }}>
+          <p style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.7, margin: "12px 0 6px" }}>
+            Picks are ranked by <strong style={{ color: "white" }}>edge %</strong> — the gap between our Poisson+Elo model probability and Pinnacle&apos;s de-vigged market price.
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+            <span style={{ fontSize: 12, color: "#f97316", background: "rgba(249,115,22,0.1)", padding: "3px 10px", borderRadius: 6, fontWeight: 700 }}>🔥 Edge ≥10% = Strong</span>
+            <span style={{ fontSize: 12, color: "#22c55e", background: "rgba(34,197,94,0.1)", padding: "3px 10px", borderRadius: 6, fontWeight: 700 }}>✅ Edge 5–10% = Lean</span>
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>Kelly Criterion sizing shown per pick.</span>
+          </div>
+          <Link href="/about" style={{ fontSize: 12, color: "#7c3aed", textDecoration: "none", fontWeight: 600 }}>
+            Full methodology → /about
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 import { BetSuggestion, FactorBreakdown } from "@/lib/bet-analyzer";
 
 
@@ -380,6 +426,9 @@ export default function PicksPage() {
             </button>
           </div>
         </div>
+
+        {/* How are these scored? */}
+        <HowScoredExplainer />
 
         {loading ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
