@@ -161,6 +161,20 @@ function MatchCard({ m }: { m: Match }) {
           ))}
         </div>
 
+        {/* No odds yet badge — shown when we have no real market data */}
+        {(!m.homeOdds || m.homeOdds <= 1) && (!m.bets || m.bets.length === 0) && (
+          <div style={{
+            background: "rgba(107,114,128,0.08)",
+            borderRadius: 9,
+            border: "1px solid rgba(107,114,128,0.2)",
+            padding: "8px 10px",
+            marginBottom: 10,
+            textAlign: "center",
+          }}>
+            <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>📊 No odds yet</span>
+          </div>
+        )}
+
         {/* Top value pick inline (if any) */}
         {topPick && (
           <div style={{

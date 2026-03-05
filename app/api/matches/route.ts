@@ -38,12 +38,26 @@ function applyEdge(match: MatchDataExtended) {
 }
 
 // Normalize team name for fuzzy matching against Odds API
-function normName(n: string) {
-  return n.toLowerCase()
-    .replace(/\b(fc|cf|afc|sc|ac|bv|bvb|united|city|athletic|club|hotspur|albion|wanderers|rovers|county|town)\b/g, "")
-    .replace(/[^a-z0-9]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+const TEAM_ALIASES: Record<string,string> = {
+  "münchen":"munich","munchen":"munich","atalanta bc":"atalanta",
+  "bayer 04 leverkusen":"leverkusen","bayer leverkusen":"leverkusen",
+  "paris saint-germain":"psg","paris saint germain":"psg","paris sg":"psg",
+  "brighton and hove albion":"brighton","wolverhampton wanderers":"wolves",
+  "tottenham hotspur":"tottenham","west ham united":"west ham",
+  "manchester united":"man united","manchester city":"man city",
+  "newcastle united":"newcastle","nottingham forest":"forest",
+  "borussia dortmund":"dortmund","rb leipzig":"leipzig",
+  "inter milan":"inter","ac milan":"milan","as roma":"roma",
+  "atletico madrid":"atletico","galatasaray":"galatasaray",
+};
+function normName(n:string):string {
+  const s = n.toLowerCase()
+    .replace(/[àáâãäå]/g,'a').replace(/[èéêë]/g,'e')
+    .replace(/[ìíîï]/g,'i').replace(/[òóôõöø]/g,'o')
+    .replace(/[ùúûü]/g,'u').replace(/ñ/g,'n').replace(/ç/g,'c')
+    .replace(/\b(fc|cf|afc|sc|ac)\b/g,'')
+    .replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+  return TEAM_ALIASES[s] ?? s;
 }
 
 function teamsMatch(a: string, b: string): boolean {
