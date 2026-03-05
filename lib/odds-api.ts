@@ -31,7 +31,7 @@ async function fetchEvents(sportKey: string): Promise<OddsEvent[]> {
   try {
     const res = await fetch(
       `${BASE}/sports/${sportKey}/odds?apiKey=${apiKey}&regions=us,uk,au&markets=h2h,totals&oddsFormat=decimal&daysFrom=7`,
-      { next: { revalidate: 600 } }
+      { next: { revalidate: 21600 } } // 6h cache — preserves 500 free credits/month
     );
     if (!res.ok) return [];
     return res.json();

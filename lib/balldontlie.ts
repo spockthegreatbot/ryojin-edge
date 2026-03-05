@@ -17,11 +17,20 @@ interface BDLTeam {
 }
 
 interface BDLGame {
-  home_team: { id: number };
-  visitor_team: { id: number };
+  id: number;
+  date: string;
+  home_team: { id: number; full_name: string };
+  visitor_team: { id: number; full_name: string };
   home_team_score: number;
   visitor_team_score: number;
   status: string;
+}
+
+export interface NBAGame {
+  id: number;
+  date: string;
+  homeTeam: string;
+  awayTeam: string;
 }
 
 interface BDLSeasonAvg {
@@ -61,6 +70,29 @@ export async function getTeamPtsAvg(teamId: number): Promise<number | null> {
     return avgs[0]?.pts ?? null;
   } catch {
     return null;
+  }
+}
+
+export async function getUpcomingNBAGames(dateFrom: string, dateTo: string): Promise<NBAGame[]> {
+  try {
+    const res = await fetch(
+      `${BASE}/games?start_date=${dateFrom}&end_date=${dateTo}&per_page=30`,
+      {
+        headers: authHeaders(),
+        next: { revalidate: 21600 }, // 6h cache
+      }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const games: BDLGame[] = data.data ?? [];
+    return games.map((g) => ({
+      id: g.id,
+      date: g.date,
+      homeTeam: g.home_team.full_name,
+      awayTeam: g.visitor_team.full_name,
+    }));
+  } catch {
+    return [];
   }
 }
 

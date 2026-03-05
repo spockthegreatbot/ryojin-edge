@@ -59,6 +59,18 @@ export async function getUpcomingMatches(competitionCode: string): Promise<FDMat
   return data?.matches ?? [];
 }
 
+// Get upcoming matches within a date range
+export async function getUpcomingMatchesRange(
+  competitionCode: string,
+  dateFrom: string,
+  dateTo: string
+): Promise<FDMatch[]> {
+  const data = await fdFetch<{ matches: FDMatch[] }>(
+    `/competitions/${competitionCode}/matches?status=SCHEDULED&dateFrom=${dateFrom}&dateTo=${dateTo}&limit=15`
+  );
+  return data?.matches ?? [];
+}
+
 // Get standings (includes form for last 5)
 export async function getStandings(competitionCode: string): Promise<FDStanding[]> {
   const data = await fdFetch<{ standings: { type: string; table: FDStanding[] }[] }>(
