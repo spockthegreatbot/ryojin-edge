@@ -251,7 +251,9 @@ export default function Home() {
     return () => clearInterval(t);
   }, []);
 
-  const filtered = matches.filter((m) => tab === "all" || m.sport === tab);
+  const filtered = matches
+    .filter((m) => tab === "all" || m.sport === tab)
+    .sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 
   return (
     <main style={{ minHeight: "100vh", background: "#0a0a0f", padding: "24px 16px" }}>

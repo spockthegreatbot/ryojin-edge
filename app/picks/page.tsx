@@ -150,7 +150,12 @@ export default function PicksPage() {
       });
 
       // Sort by edge descending
-      allValue.sort((a, b) => b.edge - a.edge);
+      // Sort by date ascending (soonest first), then by edge descending within same match
+      allValue.sort((a, b) => {
+        const timeDiff = new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime();
+        if (timeDiff !== 0) return timeDiff;
+        return b.edge - a.edge;
+      });
       setValueBets(allValue);
       setLastUpdated(new Date());
     } catch {
