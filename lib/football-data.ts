@@ -21,6 +21,7 @@ interface FDMatch {
   awayTeam: FDTeam;
   score: { fullTime: { home: number | null; away: number | null } };
   competition: { code: string; name: string };
+  referees?: { id: number; name: string; type: string; nationality?: string }[];
 }
 
 interface FDStanding {

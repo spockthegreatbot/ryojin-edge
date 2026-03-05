@@ -1,3 +1,5 @@
+import type { RefereeStat } from "./referees";
+
 export interface MatchData {
   id: string;
   sport: "soccer" | "nba";
@@ -28,6 +30,11 @@ export interface MatchData {
   firstHalfGoalsAvg: number;
   varLikelihood: number; // %
   props: { label: string; value: string; confidence: number }[];
+  // Algorithm v2 fields (optional — populated for live fixtures)
+  homeElo?: number;
+  awayElo?: number;
+  referee?: string | null;
+  refereeStats?: RefereeStat | null;
 }
 
 const T = () => Date.now();

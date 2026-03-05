@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { MOCK_MATCHES } from "@/lib/mock-data";
 
 export interface NewsItem {
   title: string;
@@ -14,28 +13,33 @@ function parseRSS(xml: string): NewsItem[] {
   const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
 
   for (const item of itemMatches.slice(0, 6)) {
-    const title = item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1]
-      ?? item.match(/<title>(.*?)<\/title>/)?.[1]
-      ?? "";
-    const link = item.match(/<link>(.*?)<\/link>/)?.[1]
-      ?? item.match(/<guid[^>]*>(.*?)<\/guid>/)?.[1]
-      ?? "";
+    const title =
+      item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/)?.[1] ??
+      item.match(/<title>(.*?)<\/title>/)?.[1] ??
+      "";
+    const link =
+      item.match(/<link>(.*?)<\/link>/)?.[1] ??
+      item.match(/<guid[^>]*>(.*?)<\/guid>/)?.[1] ??
+      "";
     const pubDate = item.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] ?? "";
-    const description = item.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1]
-      ?? item.match(/<description>([\s\S]*?)<\/description>/)?.[1]
-      ?? "";
+    const description =
+      item.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1] ??
+      item.match(/<description>([\s\S]*?)<\/description>/)?.[1] ??
+      "";
 
-    // Extract source from Google News URL or description
-    const sourceMatch = item.match(/<source[^>]*>(.*?)<\/source>/)?.[1]
-      ?? item.match(/- ([\w\s]+)$/m)?.[1]
-      ?? "News";
+    const sourceMatch =
+      item.match(/<source[^>]*>(.*?)<\/source>/)?.[1] ??
+      item.match(/- ([\w\s]+)$/m)?.[1] ??
+      "News";
 
-    // Strip HTML from description
     const snippet = description.replace(/<[^>]+>/g, "").slice(0, 160).trim();
 
     if (title && link) {
       items.push({
-        title: title.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'"),
+        title: title
+          .replace(/&amp;/g, "&")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'"),
         url: link,
         source: sourceMatch.trim(),
         pubDate,
@@ -48,18 +52,27 @@ function parseRSS(xml: string): NewsItem[] {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: { matchId: string } }
 ) {
-  const match = MOCK_MATCHES.find((m) => m.id === params.matchId);
-  if (!match) {
-    return NextResponse.json({ error: "Match not found" }, { status: 404 });
-  }
+  const { searchParams } = new URL(req.url);
+  const home = searchParams.get("home") ?? "";
+  const away = searchParams.get("away") ?? "";
+  const league = searchParams.get("league") ?? "";
 
-  const queries = [
-    `${match.homeTeam} ${match.awayTeam}`,
-    `${match.homeTeam} ${match.league}`,
-  ];
+  // Build search queries from the team names passed as query params
+  const queries: string[] = [];
+  if (home && away) {
+    queries.push(`${home} vs ${away}`);
+    queries.push(`${home} ${away}`);
+  }
+  if (home && league) {
+    queries.push(`${home} ${league}`);
+  }
+  // Fallback: use matchId as-is if no team params provided
+  if (queries.length === 0) {
+    queries.push(params.matchId.replace(/-/g, " "));
+  }
 
   const allItems: NewsItem[] = [];
 
@@ -79,7 +92,7 @@ export async function GET(
         allItems.push(...items);
       }
     } catch {
-      // Silent fail
+      // Silent fail — news is best-effort
     }
     if (allItems.length >= 5) break;
   }

@@ -5,7 +5,8 @@ import Link from "next/link";
 import { MOCK_MATCHES, MatchData } from "@/lib/mock-data";
 import { calcEdgeScore, buildPropReasoning, PropReasoning, EdgeResult } from "@/lib/edge-calculator";
 import { NewsItem } from "@/app/api/news/[matchId]/route";
-import { analyzeMatch } from "@/lib/bet-analyzer";
+import { analyzeMatch, BetSuggestion, FactorBreakdown } from "@/lib/bet-analyzer";
+import { cardStyleLabel } from "@/lib/referees";
 
 const EDGE_COLORS = { red: "#ef4444", yellow: "#eab308", green: "#22c55e" };
 const FORM_COLORS: Record<string, string> = { W: "#22c55e", D: "#eab308", L: "#ef4444" };
@@ -61,6 +62,35 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
+function FactorTags({ factors }: { factors: FactorBreakdown[] }) {
+  const dirColor = (d: "+" | "-" | "=") =>
+    d === "+" ? "#22c55e" : d === "-" ? "#ef4444" : "#6b7280";
+  const dirIcon = (d: "+" | "-" | "=") =>
+    d === "+" ? "📈" : d === "-" ? "📉" : "➖";
+
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+      {factors.map((f, i) => (
+        <span
+          key={i}
+          style={{
+            fontSize: 10,
+            color: dirColor(f.direction),
+            background: `${dirColor(f.direction)}18`,
+            border: `1px solid ${dirColor(f.direction)}33`,
+            borderRadius: 5,
+            padding: "2px 7px",
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {dirIcon(f.direction)} {f.label} {f.direction}{Math.abs(Math.round(f.impact * 100))}%
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function PropCard({ p }: { p: PropReasoning }) {
   const [open, setOpen] = useState(false);
   const conf = p.confidence;
@@ -78,12 +108,9 @@ function PropCard({ p }: { p: PropReasoning }) {
           <div style={{ fontSize: 10, color: "#6b7280" }}>confidence</div>
         </div>
       </div>
-
       <div style={{ background: "#0a0a0f", borderRadius: 4, height: 5, overflow: "hidden", marginBottom: 12 }}>
         <div style={{ background: barColor, width: `${conf}%`, height: "100%", transition: "width 0.4s" }} />
       </div>
-
-      {/* Reasoning toggle */}
       <button
         onClick={() => setOpen(!open)}
         style={{
@@ -105,7 +132,6 @@ function PropCard({ p }: { p: PropReasoning }) {
         <span>🧠 Why this prediction?</span>
         <span style={{ fontSize: 10 }}>{open ? "▲" : "▼"}</span>
       </button>
-
       {open && (
         <div style={{ marginTop: 10, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10 }}>
           {p.why.map((reason, i) => (
@@ -122,12 +148,7 @@ function PropCard({ p }: { p: PropReasoning }) {
 
 function NewsCard({ item }: { item: NewsItem }) {
   return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{ textDecoration: "none" }}
-    >
+    <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
       <div
         style={{
           background: "#12121a",
@@ -137,12 +158,8 @@ function NewsCard({ item }: { item: NewsItem }) {
           cursor: "pointer",
           transition: "border-color 0.2s",
         }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(124,58,237,0.35)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.07)";
-        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(124,58,237,0.35)"; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.07)"; }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div style={{ flex: 1 }}>
@@ -156,9 +173,7 @@ function NewsCard({ item }: { item: NewsItem }) {
             )}
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <span style={{ fontSize: 11, color: "#7c3aed", fontWeight: 500 }}>{item.source}</span>
-              {item.pubDate && (
-                <span style={{ fontSize: 11, color: "#374151" }}>{timeAgo(item.pubDate)}</span>
-              )}
+              {item.pubDate && <span style={{ fontSize: 11, color: "#374151" }}>{timeAgo(item.pubDate)}</span>}
             </div>
           </div>
           <span style={{ color: "#374151", fontSize: 14, flexShrink: 0, marginTop: 2 }}>↗</span>
@@ -175,13 +190,72 @@ function displayStat(value: number | string): string {
   return typeof value === "number" ? value.toString() : value;
 }
 
+// Collapsible "How we calculated this" section
+function AlgorithmExplainer({ bets, isSoccer }: { bets: BetSuggestion[]; isSoccer: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 16, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 12 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "none",
+          border: "1px solid rgba(124,58,237,0.25)",
+          color: "#7c3aed",
+          borderRadius: 8,
+          padding: "7px 14px",
+          fontSize: 12,
+          cursor: "pointer",
+          fontWeight: 600,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        <span>🔬 How we calculated this</span>
+        <span style={{ fontSize: 10, opacity: 0.7 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div style={{
+          marginTop: 12,
+          background: "#0d0d18",
+          borderRadius: 10,
+          border: "1px solid rgba(124,58,237,0.15)",
+          padding: 16,
+          fontSize: 13,
+          color: "#9ca3af",
+          lineHeight: 1.7,
+        }}>
+          <p style={{ margin: "0 0 10px", fontWeight: 600, color: "#c4b5fd" }}>📐 Model Components</p>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+            <li><strong style={{ color: "#e5e7eb" }}>Elo Ratings:</strong> Teams ranked by league table position → Elo score (1250–1750). Win probability calculated using logistic formula with 50-point home advantage.</li>
+            {isSoccer && (
+              <>
+                <li><strong style={{ color: "#e5e7eb" }}>Dixon-Coles Poisson:</strong> Goals modelled as Poisson distributions. Low-scoring scorelines (0-0, 1-0, 0-1, 1-1) corrected with ρ=−0.13 to reflect real-world under-representation of these results in standard Poisson.</li>
+                <li><strong style={{ color: "#e5e7eb" }}>Referee Intelligence:</strong> Referee card style (strict/lenient) adjusts cards market confidence. Penalty rate flags are applied to match result reasoning.</li>
+              </>
+            )}
+            <li><strong style={{ color: "#e5e7eb" }}>Recent Form:</strong> Last 5 results weighted (W=1, D=0.4, L=0). Form differential adjusts match result probabilities.</li>
+            <li><strong style={{ color: "#e5e7eb" }}>H2H Record:</strong> Last 10 head-to-head results contribute 10–15% weight to win probability.</li>
+            <li><strong style={{ color: "#e5e7eb" }}>De-vigged Market:</strong> Bookmaker margin removed from odds to get true implied probability. Our model vs true market = edge.</li>
+            <li><strong style={{ color: "#e5e7eb" }}>Kelly Criterion:</strong> ¼ Kelly fraction used for staking suggestions. (Full Kelly × 0.25 for safety.)</li>
+          </ul>
+          {bets.some((b) => b.factors && b.factors.length > 0) && (
+            <p style={{ margin: "12px 0 0", fontSize: 12, color: "#4b5563" }}>
+              Factor breakdown tags show each component&apos;s contribution to edge: 📈 positive / 📉 negative / ➖ neutral
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MatchPage({ params }: { params: { id: string } }) {
   const [m, setM] = useState<MatchData | undefined>(MOCK_MATCHES.find((x) => x.id === params.id));
   const [news, setNews] = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
 
   useEffect(() => {
-    // If not found in mock data, fetch from live matches API
     if (!m) {
       fetch("/api/matches")
         .then((r) => r.json())
@@ -193,17 +267,26 @@ export default function MatchPage({ params }: { params: { id: string } }) {
     }
   }, [params.id, m]);
 
+  // FIX 1: Pass team names as query params so news API can search without mock-data lookup
   useEffect(() => {
-    fetch(`/api/news/${params.id}`)
+    if (!m) return; // wait until match is loaded
+    const qs = m.homeTeam && m.awayTeam
+      ? `?home=${encodeURIComponent(m.homeTeam)}&away=${encodeURIComponent(m.awayTeam)}&league=${encodeURIComponent(m.league)}`
+      : "";
+    fetch(`/api/news/${params.id}${qs}`)
       .then((r) => r.json())
       .then((d) => { setNews(d); setNewsLoading(false); })
       .catch(() => setNewsLoading(false));
-  }, [params.id]);
+  }, [params.id, m]);
 
   if (!m) {
     return (
       <main style={{ background: "#0a0a0f", minHeight: "100vh", padding: 40 }}>
-        <div style={{ color: "#6b7280" }}>Loading match...</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, color: "#6b7280" }}>
+          <div style={{ width: 20, height: 20, border: "2px solid #7c3aed", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+          Loading match...
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </main>
     );
   }
@@ -219,6 +302,10 @@ export default function MatchPage({ params }: { params: { id: string } }) {
 
   const propReasonings: PropReasoning[] = buildPropReasoning(m);
   const isSoccer = m.sport === "soccer";
+  const bets = analyzeMatch({ ...m });
+  const valueBets = bets.filter((b) => b.value);
+  const otherBets = bets.filter((b) => !b.value).slice(0, 3);
+  const allBets = [...valueBets, ...otherBets];
 
   const statRows = isSoccer
     ? [
@@ -251,10 +338,30 @@ export default function MatchPage({ params }: { params: { id: string } }) {
               }}>
                 {isSoccer ? "⚽" : "🏀"} {m.league}
               </div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "white" }}>{m.homeTeam}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "white" }}>{m.homeTeam}</div>
               <div style={{ color: "#4b5563", margin: "4px 0", fontSize: 13 }}>vs</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "#d1d5db" }}>{m.awayTeam}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "#d1d5db" }}>{m.awayTeam}</div>
               <div style={{ fontSize: 13, color: "#6b7280", marginTop: 8 }}>🕐 {formatKickoff(m.commenceTime)} AEDT</div>
+              {/* Referee tag */}
+              {m.referee && (
+                <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>⚖️ Referee:</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#9ca3af" }}>{m.referee}</span>
+                  {m.refereeStats && (
+                    <span style={{
+                      fontSize: 10,
+                      color: cardStyleLabel(m.refereeStats.cardStyle).color,
+                      background: `${cardStyleLabel(m.refereeStats.cardStyle).color}18`,
+                      border: `1px solid ${cardStyleLabel(m.refereeStats.cardStyle).color}33`,
+                      borderRadius: 4,
+                      padding: "1px 6px",
+                      fontWeight: 700,
+                    }}>
+                      {cardStyleLabel(m.refereeStats.cardStyle).label}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <div style={{ textAlign: "center" }}>
               <div style={{
@@ -263,15 +370,21 @@ export default function MatchPage({ params }: { params: { id: string } }) {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontWeight: 700, fontSize: 26, color: "#0a0a0f",
                 margin: "0 auto 8px",
-                boxShadow: `0 0 20px ${EDGE_COLORS[edge.color]}44`,
+                boxShadow: `0 0 24px ${EDGE_COLORS[edge.color]}55`,
               }}>
                 {edge.score}
               </div>
               <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>Edge Score</div>
+              {/* Elo display */}
+              {m.homeElo && m.awayElo && (
+                <div style={{ marginTop: 8, fontSize: 11, color: "#4b5563" }}>
+                  Elo {m.homeElo.toFixed(0)} / {m.awayElo.toFixed(0)}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Odds */}
+          {/* Odds bar */}
           <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
             {[
               [m.homeTeam, m.homeOdds],
@@ -291,51 +404,165 @@ export default function MatchPage({ params }: { params: { id: string } }) {
         </Card>
 
         {/* Bet Suggestions */}
-        {(() => {
-          const bets = analyzeMatch({ ...m });
-          const valueBets = bets.filter((b) => b.value);
-          const otherBets = bets.filter((b) => !b.value).slice(0, 3);
-          const allBets = [...valueBets, ...otherBets];
-          return (
-            <Section title="🎯 Betting Analysis">
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {allBets.map((b, i) => (
-                  <Card key={i} style={{ padding: "14px 16px", border: b.value ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(255,255,255,0.07)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-                          <span style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8 }}>{b.market}</span>
-                          {b.value && <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 700, background: "rgba(34,197,94,0.1)", padding: "1px 6px", borderRadius: 4 }}>VALUE BET</span>}
-                          <span style={{ fontSize: 11 }}>{b.tier}</span>
-                        </div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: b.value ? "#22c55e" : "white", marginBottom: 6 }}>{b.pick}</div>
-                        <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>{b.reasoning}</div>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, minWidth: 80 }}>
-                        {b.odds && <div style={{ fontSize: 18, fontWeight: 700, color: "#7c3aed" }}>{b.odds.toFixed(2)}</div>}
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{b.confidence}%</div>
-                        <div style={{ fontSize: 11, color: b.edge >= 0.05 ? "#22c55e" : b.edge >= 0 ? "#eab308" : "#ef4444" }}>
-                          {b.edge >= 0 ? "+" : ""}{(b.edge * 100).toFixed(1)}¢ edge
-                        </div>
-                      </div>
+        <Section title="🎯 Betting Analysis">
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {allBets.map((b, i) => (
+              <Card key={i} style={{ padding: "16px 18px", border: b.value ? "1px solid rgba(34,197,94,0.25)" : "1px solid rgba(255,255,255,0.07)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8 }}>{b.market}</span>
+                      {b.value && <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 700, background: "rgba(34,197,94,0.1)", padding: "1px 6px", borderRadius: 4 }}>VALUE BET</span>}
+                      <span style={{ fontSize: 11 }}>{b.tier}</span>
                     </div>
-                    {/* Probability comparison bar */}
-                    <div style={{ marginTop: 10 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#4b5563", marginBottom: 4 }}>
-                        <span>Model: {Math.round(b.modelProb * 100)}%</span>
-                        <span>Market: {Math.round(b.marketProb * 100)}%</span>
-                      </div>
-                      <div style={{ background: "#0a0a0f", borderRadius: 4, height: 6, position: "relative", overflow: "hidden" }}>
-                        <div style={{ background: "#7c3aed44", width: `${b.marketProb * 100}%`, height: "100%", position: "absolute" }} />
-                        <div style={{ background: b.value ? "#22c55e" : "#7c3aed", width: `${b.modelProb * 100}%`, height: "100%", borderRadius: 4, opacity: 0.8 }} />
-                      </div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: b.value ? "#22c55e" : "white", marginBottom: 4 }}>{b.pick}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>{b.reasoning}</div>
+                    {/* Factor breakdown tags */}
+                    {b.factors && b.factors.length > 0 && <FactorTags factors={b.factors} />}
+                    {/* Kelly suggestion */}
+                    <div style={{ marginTop: 8, fontSize: 11, color: b.value ? "#22c55e" : "#4b5563" }}>
+                      📊 Kelly: {b.kellySuggestion}
                     </div>
-                  </Card>
+                    {/* Referee note */}
+                    {b.refereeNote && (
+                      <div style={{ marginTop: 4, fontSize: 11, color: "#6b7280" }}>{b.refereeNote}</div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, minWidth: 80 }}>
+                    {b.odds && <div style={{ fontSize: 18, fontWeight: 700, color: "#7c3aed" }}>{b.odds.toFixed(2)}</div>}
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{b.confidence}%</div>
+                    <div style={{ fontSize: 11, color: b.edge >= 0.05 ? "#22c55e" : b.edge >= 0 ? "#eab308" : "#ef4444" }}>
+                      {b.edge >= 0 ? "+" : ""}{(b.edge * 100).toFixed(1)}¢ edge
+                    </div>
+                  </div>
+                </div>
+                {/* Probability comparison bar */}
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#4b5563", marginBottom: 4 }}>
+                    <span>Model: {Math.round(b.modelProb * 100)}%</span>
+                    <span>Market: {Math.round(b.marketProb * 100)}%</span>
+                  </div>
+                  <div style={{ background: "#0a0a0f", borderRadius: 4, height: 6, position: "relative", overflow: "hidden" }}>
+                    <div style={{ background: "#7c3aed44", width: `${b.marketProb * 100}%`, height: "100%", position: "absolute" }} />
+                    <div style={{ background: b.value ? "#22c55e" : "#7c3aed", width: `${b.modelProb * 100}%`, height: "100%", borderRadius: 4, opacity: 0.8 }} />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          <AlgorithmExplainer bets={allBets} isSoccer={isSoccer} />
+        </Section>
+
+        {/* ── Referee Intelligence Section ── */}
+        {m.refereeStats && m.referee && (
+          <Section title="⚖️ Referee Intelligence">
+            <Card style={{ padding: "20px 22px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+                {/* Avatar placeholder */}
+                <div style={{
+                  width: 56, height: 56, borderRadius: "50%",
+                  background: "linear-gradient(135deg, #7c3aed44, #7c3aed22)",
+                  border: "2px solid rgba(124,58,237,0.4)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 24, flexShrink: 0,
+                }}>
+                  ⚖️
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "white", marginBottom: 4 }}>{m.referee}</div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700,
+                      color: cardStyleLabel(m.refereeStats.cardStyle).color,
+                      background: `${cardStyleLabel(m.refereeStats.cardStyle).color}18`,
+                      border: `1px solid ${cardStyleLabel(m.refereeStats.cardStyle).color}33`,
+                      padding: "2px 8px", borderRadius: 6,
+                    }}>
+                      {cardStyleLabel(m.refereeStats.cardStyle).label} on cards
+                    </span>
+                    <span style={{ fontSize: 11, color: "#4b5563" }}>{m.refereeStats.league === "PL" ? "Premier League" : m.refereeStats.league === "CL" ? "Champions League" : "EPL / UCL"}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.6, fontStyle: "italic" }}>
+                    &quot;{m.refereeStats.notes}&quot;
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10, marginTop: 18 }}>
+                {[
+                  { label: "Yellow Cards", value: m.refereeStats.yellowCardsPerGame.toFixed(1), unit: "/game", color: "#eab308", warn: m.refereeStats.yellowCardsPerGame > 3.8 },
+                  { label: "Red Cards", value: m.refereeStats.redCardsPerGame.toFixed(2), unit: "/game", color: "#ef4444", warn: m.refereeStats.redCardsPerGame > 0.10 },
+                  { label: "Penalties", value: m.refereeStats.penaltiesPerGame.toFixed(2), unit: "/game", color: "#7c3aed", warn: m.refereeStats.penaltiesPerGame > 0.32 },
+                  { label: "Fouls", value: m.refereeStats.foulsPerGame.toFixed(1), unit: "/game", color: "#6b7280", warn: false },
+                  { label: "VAR Calls", value: m.refereeStats.varInterventionsPerGame.toFixed(2), unit: "/game", color: "#3b82f6", warn: m.refereeStats.varInterventionsPerGame > 0.40 },
+                ].map(({ label, value, unit, color, warn }) => (
+                  <div key={label} style={{
+                    background: "#0d0d18",
+                    borderRadius: 10,
+                    border: `1px solid ${warn ? color + "44" : "rgba(255,255,255,0.05)"}`,
+                    padding: "12px 14px",
+                  }}>
+                    <div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: warn ? color : "white" }}>
+                      {value}
+                      <span style={{ fontSize: 11, color: "#4b5563", fontWeight: 400 }}>{unit}</span>
+                    </div>
+                    {warn && <div style={{ fontSize: 9, color, marginTop: 3, fontWeight: 600 }}>▲ Above avg</div>}
+                  </div>
                 ))}
               </div>
-            </Section>
-          );
-        })()}
+
+              {/* Home bias meter */}
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  Home Bias Indicator
+                </div>
+                <div style={{ position: "relative", height: 20 }}>
+                  {/* Track */}
+                  <div style={{ height: 6, background: "#1e1e30", borderRadius: 3, position: "absolute", top: 7, left: 0, right: 0 }} />
+                  {/* Center marker */}
+                  <div style={{ width: 2, height: 14, background: "#374151", position: "absolute", top: 3, left: "50%", transform: "translateX(-50%)" }} />
+                  {/* Indicator dot */}
+                  <div style={{
+                    width: 14, height: 14,
+                    background: Math.abs(m.refereeStats.homeBias) < 0.3 ? "#22c55e" : "#eab308",
+                    borderRadius: "50%",
+                    position: "absolute",
+                    top: 3,
+                    left: `${50 + (m.refereeStats.homeBias / 2) * 50}%`,
+                    transform: "translateX(-50%)",
+                    boxShadow: `0 0 8px ${Math.abs(m.refereeStats.homeBias) < 0.3 ? "#22c55e" : "#eab308"}66`,
+                  }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#374151", marginTop: 4 }}>
+                  <span>← Away bias</span>
+                  <span>Neutral</span>
+                  <span>Home bias →</span>
+                </div>
+              </div>
+
+              {/* Impact on picks */}
+              <div style={{
+                marginTop: 14,
+                padding: "10px 14px",
+                background: "rgba(124,58,237,0.08)",
+                borderRadius: 8,
+                border: "1px solid rgba(124,58,237,0.2)",
+                fontSize: 12, color: "#c4b5fd",
+              }}>
+                💡 <strong>Impact on picks:</strong>{" "}
+                {m.refereeStats.cardStyle === "strict"
+                  ? `${m.referee} is strict — cards market confidence boosted by 7%. High card rate (${m.refereeStats.yellowCardsPerGame.toFixed(1)}/game) supports Over ${3.5} cards.`
+                  : m.refereeStats.cardStyle === "lenient"
+                  ? `${m.referee} is lenient — cards market confidence reduced by 5%. Low card rate (${m.refereeStats.yellowCardsPerGame.toFixed(1)}/game).`
+                  : `${m.referee} is average on cards (${m.refereeStats.yellowCardsPerGame.toFixed(1)}/game). No major adjustment applied.`}
+                {m.refereeStats.penaltiesPerGame > 0.32 && ` Elevated penalty risk (${m.refereeStats.penaltiesPerGame.toFixed(2)}/game).`}
+                {m.refereeStats.varInterventionsPerGame > 0.40 && " High VAR usage — expect stoppages."}
+              </div>
+            </Card>
+          </Section>
+        )}
 
         {/* Edge Reasoning */}
         <Section title="🧠 Edge Analysis">
@@ -365,7 +592,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
           </Card>
         </Section>
 
-        {/* Prop Predictions with Reasoning */}
+        {/* Prop Predictions */}
         <Section title="📊 Prop Predictions">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
             {propReasonings.map((p) => (
@@ -386,10 +613,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
                 { label: "Away Clean Sheet", value: `${m.cleanSheetAway}%`, color: "#9ca3af" },
                 { label: "xG Total", value: `${(m.xgHome + m.xgAway).toFixed(1)}`, color: "white" },
               ].map(({ label, value, color }) => (
-                <div key={label} style={{
-                  background: "#12121a", borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.07)", padding: "14px 16px",
-                }}>
+                <div key={label} style={{ background: "#12121a", borderRadius: 12, border: "1px solid rgba(255,255,255,0.07)", padding: "14px 16px" }}>
                   <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color }}>{value}</div>
                 </div>
@@ -452,12 +676,9 @@ export default function MatchPage({ params }: { params: { id: string } }) {
           </Card>
         </Section>
 
-        {/* Season Stats Table */}
+        {/* Season Stats */}
         <Section title="📋 Season Stats">
-          <div style={{
-            background: "#12121a", borderRadius: 14,
-            border: "1px solid rgba(255,255,255,0.07)", overflow: "hidden",
-          }}>
+          <div style={{ background: "#12121a", borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
@@ -483,15 +704,12 @@ export default function MatchPage({ params }: { params: { id: string } }) {
           </div>
         </Section>
 
-        {/* News Section */}
+        {/* News */}
         <Section title="📰 Latest News">
           {newsLoading ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {[1, 2, 3].map((i) => (
-                <div key={i} style={{
-                  background: "#12121a", borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.07)", padding: "14px 16px",
-                }}>
+                <div key={i} style={{ background: "#12121a", borderRadius: 12, border: "1px solid rgba(255,255,255,0.07)", padding: "14px 16px" }}>
                   <div style={{ background: "#1e1e30", borderRadius: 4, height: 14, width: "80%", marginBottom: 8, animation: "pulse 1.5s infinite" }} />
                   <div style={{ background: "#1e1e30", borderRadius: 4, height: 10, width: "50%", animation: "pulse 1.5s infinite" }} />
                 </div>
@@ -499,9 +717,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
             </div>
           ) : news.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {news.map((item, i) => (
-                <NewsCard key={i} item={item} />
-              ))}
+              {news.map((item, i) => <NewsCard key={i} item={item} />)}
             </div>
           ) : (
             <Card>
@@ -511,6 +727,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
             </Card>
           )}
         </Section>
+
         {/* Data source note */}
         <div style={{
           marginTop: 16, padding: "10px 14px",
@@ -520,10 +737,13 @@ export default function MatchPage({ params }: { params: { id: string } }) {
         }}>
           📡 <strong style={{ color: "#4b5563" }}>Data sources:</strong>{" "}
           Odds — The Odds API · Soccer stats — football-data.org · NBA stats — BallDontLie ·
-          Stats showing &quot;—&quot; are not yet available for this fixture.
+          Referee data — 2024-25 season averages · Stats showing &quot;—&quot; are not yet available.
         </div>
       </div>
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </main>
   );
 }

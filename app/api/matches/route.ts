@@ -10,6 +10,8 @@ import {
   getFootballTeamId,
   LEAGUE,
 } from "@/lib/api-sports";
+import { teamEloFromPosition } from "@/lib/elo";
+import { getRefereeStats } from "@/lib/referees";
 
 // Extended MatchData with data source flags
 export interface MatchDataExtended extends MatchData {
@@ -165,6 +167,26 @@ export async function GET() {
       drawOdds = oddsMatch.drawOdds;
     }
 
+    // Compute Elo ratings from league table position
+    const totalTeams = standings.length || 20;
+    const homeStanding = standings.find((s) => s.team.id === match.homeTeam.id);
+    const awayStanding = standings.find((s) => s.team.id === match.awayTeam.id);
+    const homeElo = homeStanding
+      ? teamEloFromPosition(homeStanding.position, totalTeams)
+      : 1500;
+    const awayElo = awayStanding
+      ? teamEloFromPosition(awayStanding.position, totalTeams)
+      : 1500;
+
+    // Referee intelligence
+    const refName = (match.referees?.[0]?.name) ?? null;
+    const refereeStats = refName ? getRefereeStats(refName) : null;
+
+    // VAR likelihood boosted by referee data
+    const varLikelihoodCalc = refereeStats
+      ? Math.round(refereeStats.varInterventionsPerGame * 100)
+      : 0;
+
     results.push(applyEdge({
       id: `fd-${match.id}`,
       sport: "soccer",
@@ -192,10 +214,14 @@ export async function GET() {
       cleanSheetHome,
       cleanSheetAway,
       firstHalfGoalsAvg: 0,
-      varLikelihood: 0,
+      varLikelihood: varLikelihoodCalc,
       props: [],
       dataSourceApiSports,
       dataSourceFootballData,
+      homeElo,
+      awayElo,
+      referee: refName,
+      refereeStats,
     }));
   }
 
