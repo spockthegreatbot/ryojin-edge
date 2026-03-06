@@ -4,6 +4,7 @@
  */
 
 export const dynamic = "force-dynamic";
+export const preferredRegion = "iad1"; // Force US East — bypass AU Polymarket geoblock
 
 const CLOB_BASE = "https://clob.polymarket.com";
 
