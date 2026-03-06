@@ -18,11 +18,11 @@ export async function POST(request: Request) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  for (const [k, v] of request.headers.entries()) {
+  request.headers.forEach((v, k) => {
     if (k.toLowerCase().startsWith("poly_") || k.toLowerCase() === "content-type") {
       headers[k] = v;
     }
-  }
+  });
 
   const res = await fetch(CLOB_BASE + clobPath, {
     method: "POST",
@@ -39,9 +39,9 @@ export async function GET(request: Request) {
   const clobPath = url.searchParams.get("path") || "/";
 
   const headers: Record<string, string> = {};
-  for (const [k, v] of request.headers.entries()) {
+  request.headers.forEach((v, k) => {
     if (k.toLowerCase().startsWith("poly_")) headers[k] = v;
-  }
+  });
 
   const res = await fetch(CLOB_BASE + clobPath, { headers });
   const json = await res.json().catch(() => ({}));
