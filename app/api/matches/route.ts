@@ -130,10 +130,19 @@ function normName(n:string):string {
 function teamsMatch(a: string, b: string): boolean {
   const na = normName(a);
   const nb = normName(b);
+  if (na === nb) return true;
   const wordsA = na.split(" ").filter(Boolean);
   const wordsB = nb.split(" ").filter(Boolean);
-  return wordsA.some(w => w.length > 3 && nb.includes(w)) ||
-    wordsB.some(w => w.length > 3 && na.includes(w));
+  // Significant word match (> 3 chars, not common filler)
+  const filler = new Set(["city","united","club","real","sport","athletic","union","inter","county"]);
+  const sigA = wordsA.filter(w => w.length > 3 && !filler.has(w));
+  const sigB = wordsB.filter(w => w.length > 3 && !filler.has(w));
+  // Any significant word from A appears in full B string or vice versa
+  if (sigA.some(w => nb.includes(w)) || sigB.some(w => na.includes(w))) return true;
+  // Short-name fallback: first word of each (handles "Bayern" vs "Bayern Munich")
+  const firstA = wordsA[0]; const firstB = wordsB[0];
+  if (firstA && firstB && firstA.length > 3 && (firstA === firstB || nb.startsWith(firstA) || na.startsWith(firstB))) return true;
+  return false;
 }
 
 // Determine which league ID to use based on competition code
@@ -639,6 +648,61 @@ export async function GET() {
     };
   });
   results.push(...nrlResults);
+
+  // --- FALLBACK: Odds API soccer matches not matched to any stats fixture ---
+  // Collect all Odds API soccer match IDs that already appeared in results
+  const usedOddsIds = new Set(results.map(r => {
+    // Extract the odds match that was used for this result by matching teams
+    const om = oddsMatches.find(o =>
+      o.sport === "soccer" &&
+      teamsMatch(o.homeTeam, r.homeTeam) &&
+      teamsMatch(o.awayTeam, r.awayTeam)
+    );
+    return om?.id ?? null;
+  }).filter(Boolean));
+
+  const unmatchedSoccer = oddsMatches.filter(om =>
+    om.sport === "soccer" &&
+    om.homeOdds > 1 &&
+    !usedOddsIds.has(om.id)
+  );
+
+  const fallbackSoccer = unmatchedSoccer.slice(0, 20).map(om => {
+    const edge = calcEdgeScore({ homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, homeTeam: om.homeTeam, awayTeam: om.awayTeam });
+    const bets = analyzeMatch({
+      sport: "soccer", homeTeam: om.homeTeam, awayTeam: om.awayTeam,
+      homeOdds: om.homeOdds, awayOdds: om.awayOdds,
+      homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, h2hDraws: 0,
+      goalsAvgHome: 0, goalsAvgAway: 0, cornersAvgHome: 0, cornersAvgAway: 0,
+      xgHome: 0, xgAway: 0, bttsProb: 0, cleanSheetHome: 0, cleanSheetAway: 0,
+    } as Parameters<typeof analyzeMatch>[0]);
+    return {
+      id: `odds-${om.id}`,
+      sport: "soccer" as const,
+      league: om.league,
+      homeTeam: om.homeTeam,
+      awayTeam: om.awayTeam,
+      commenceTime: om.commenceTime,
+      homeOdds: om.homeOdds,
+      awayOdds: om.awayOdds,
+      drawOdds: om.drawOdds,
+      homeForm: [], awayForm: [],
+      goalsAvgHome: 0, goalsAvgAway: 0,
+      h2hHomeWins: 0, h2hTotal: 0, h2hDraws: 0,
+      cornersAvgHome: 0, cornersAvgAway: 0,
+      cardsAvgHome: 0, cardsAvgAway: 0,
+      xgHome: 0, xgAway: 0, bttsProb: 0,
+      cleanSheetHome: 0, cleanSheetAway: 0,
+      firstHalfGoalsAvg: 0, varLikelihood: 0, props: [],
+      bestOddsHome: om.bestOddsHome, bestOddsHomeBook: om.bestOddsHomeBook,
+      bestOddsAway: om.bestOddsAway, bestOddsAwayBook: om.bestOddsAwayBook,
+      allBookOdds: om.allBookOdds,
+      ...edge,
+      bets,
+    };
+  });
+
+  results.push(...fallbackSoccer);
 
   results.sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 
