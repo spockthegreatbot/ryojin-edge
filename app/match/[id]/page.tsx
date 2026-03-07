@@ -288,10 +288,11 @@ export default function MatchPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (!m || !m.homeOdds || m.homeOdds <= 1) return;
     setAiLoading(true);
+    const body = JSON.stringify(m);
     fetch(`/api/ai-analysis/${params.id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(m),
+      body,
     })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -304,6 +305,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
       })
       .catch(() => setAiError(true))
       .finally(() => setAiLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id, m?.homeOdds]);
 
   if (!m) {

@@ -21,7 +21,7 @@ export interface BetSuggestion {
   odds?: number;           // decimal odds for this selection
   value: boolean;          // true if edge >= 0.05
   reasoning: string;       // one-line explanation
-  tier: "🔥 Strong" | "✅ Lean" | "⚠️ Marginal";
+  tier: string;
   kellySuggestion: string; // "2.3% of bankroll" or "No edge (Kelly = 0)"
   factors?: FactorBreakdown[];
   refereeNote?: string;    // "⚖️ M. Oliver: strict on cards, 0.28 penalties/game"
