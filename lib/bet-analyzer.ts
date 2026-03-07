@@ -789,12 +789,12 @@ export function analyzeNBA(match: NBAGameContext): BetSuggestion[] {
 // ─── Unified entry point ─────────────────────────────────────────────────────
 
 export function analyzeMatch(
-  match: Parameters<typeof analyzeSoccer>[0] & Parameters<typeof analyzeNBA>[0] & { sport: "soccer" | "nba" }
+  match: Parameters<typeof analyzeSoccer>[0] & Partial<NBAGameContext> & { sport: string }
 ): BetSuggestion[] {
   // GUARD: Only calculate edge when we have real market odds
   const hasRealOdds = !!(match.homeOdds && match.homeOdds > 1);
   if (!hasRealOdds) return [];
 
-  if (match.sport === "nba") return analyzeNBA(match);
-  return analyzeSoccer(match);
+  if (match.sport === "nba") return analyzeNBA(match as NBAGameContext);
+  return analyzeSoccer(match as Parameters<typeof analyzeSoccer>[0]);
 }

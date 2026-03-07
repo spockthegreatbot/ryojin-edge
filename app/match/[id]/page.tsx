@@ -663,6 +663,30 @@ export default function MatchPage({ params }: { params: { id: string } }) {
           </Section>
         )}
 
+        {/* AI Reasoning */}
+        {m.aiReasoning && (
+          <Section title="🤖 AI Match Analysis">
+            <Card>
+              {m.aiHeadline && (
+                <div style={{
+                  fontSize: 13, fontWeight: 700, color: "#a78bfa",
+                  marginBottom: 14, paddingBottom: 12,
+                  borderBottom: "1px solid rgba(167,139,250,0.15)",
+                  letterSpacing: 0.2,
+                }}>
+                  {m.aiHeadline}
+                </div>
+              )}
+              <div style={{
+                fontSize: 14, color: "#d1d5db", lineHeight: 1.75,
+                whiteSpace: "pre-wrap",
+              }}>
+                {m.aiReasoning}
+              </div>
+            </Card>
+          </Section>
+        )}
+
         {/* Edge Reasoning */}
         <Section title="🧠 Edge Analysis">
           <Card>

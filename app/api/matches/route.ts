@@ -21,6 +21,7 @@ import {
   getTeamSeasonRecord,
 } from "@/lib/balldontlie";
 import type { InjuredPlayer, TeamSeasonRecord } from "@/lib/balldontlie";
+import { generateReasoning, generateHeadline } from "@/lib/ai-reasoning";
 import { getRefereeStats } from "@/lib/referees";
 import { getTeamXG } from "@/lib/understat";
 import { getMatchWeather } from "@/lib/weather";
@@ -39,6 +40,9 @@ export interface MatchDataExtended extends MatchData {
   awayRecentForm?: string[];
   homeRecord?: TeamSeasonRecord | null;
   awayRecord?: TeamSeasonRecord | null;
+  // AI reasoning
+  aiReasoning?: string;
+  aiHeadline?: string;
 }
 
 function applyEdge(match: MatchDataExtended) {
@@ -51,7 +55,53 @@ function applyEdge(match: MatchDataExtended) {
     awayTeam: match.awayTeam,
   });
   const bets = analyzeMatch({ ...match });
-  return { ...match, ...edge, bets };
+  const aiReasoning = generateReasoning({
+    sport: match.sport,
+    league: match.league,
+    homeTeam: match.homeTeam,
+    awayTeam: match.awayTeam,
+    homeOdds: match.homeOdds,
+    awayOdds: match.awayOdds,
+    drawOdds: match.drawOdds,
+    homeForm: match.homeForm,
+    awayForm: match.awayForm,
+    h2hHomeWins: match.h2hHomeWins,
+    h2hTotal: match.h2hTotal,
+    goalsAvgHome: match.goalsAvgHome,
+    goalsAvgAway: match.goalsAvgAway,
+    xgHome: match.xgHome,
+    xgAway: match.xgAway,
+    bttsProb: match.bttsProb,
+    cornersAvgHome: match.cornersAvgHome,
+    cornersAvgAway: match.cornersAvgAway,
+    homeElo: match.homeElo,
+    awayElo: match.awayElo,
+    homeTablePos: match.homeTablePos,
+    awayTablePos: match.awayTablePos,
+    referee: match.referee,
+    weather: match.weather,
+    homeInjuries: match.homeInjuries,
+    awayInjuries: match.awayInjuries,
+    homeOnBackToBack: match.homeOnBackToBack,
+    awayOnBackToBack: match.awayOnBackToBack,
+    homeRecentForm: match.homeRecentForm,
+    awayRecentForm: match.awayRecentForm,
+    homeRecord: match.homeRecord,
+    awayRecord: match.awayRecord,
+    totalLine: match.totalLine,
+  });
+  const aiHeadline = generateHeadline({
+    sport: match.sport,
+    homeTeam: match.homeTeam,
+    awayTeam: match.awayTeam,
+    homeOdds: match.homeOdds,
+    awayOdds: match.awayOdds,
+    homeInjuries: match.homeInjuries,
+    awayInjuries: match.awayInjuries,
+    homeOnBackToBack: match.homeOnBackToBack,
+    awayOnBackToBack: match.awayOnBackToBack,
+  });
+  return { ...match, ...edge, bets, aiReasoning, aiHeadline };
 }
 
 // Normalize team name for fuzzy matching against Odds API
@@ -89,7 +139,10 @@ function teamsMatch(a: string, b: string): boolean {
 // Determine which league ID to use based on competition code
 function leagueIdForComp(comp: string): number {
   if (comp === "CL") return LEAGUE.UCL;
-  return LEAGUE.EPL; // default to EPL
+  if (comp === "LL") return LEAGUE.LALIGA;
+  if (comp === "BL") return LEAGUE.BUNDESLIGA;
+  if (comp === "SA") return LEAGUE.SERIE_A;
+  return LEAGUE.EPL;
 }
 
 export async function GET() {
@@ -105,13 +158,16 @@ export async function GET() {
   });
 
   // Fetch all primary data sources in parallel
-  const [plMatches, clMatches, plStandings, clStandings, eplFixtures, uclFixtures, nbaGamesRaw, oddsMatches] = await Promise.all([
+  const [plMatches, clMatches, plStandings, clStandings, eplFixtures, uclFixtures, laligaFixtures, bundesligaFixtures, serieAFixtures, nbaGamesRaw, oddsMatches] = await Promise.all([
     getUpcomingMatchesRange("PL", dateFrom, dateTo).catch(() => []),
     getUpcomingMatchesRange("CL", dateFrom, dateTo).catch(() => []),
     getStandings("PL").catch(() => []),
     getStandings("CL").catch(() => []),
     getUpcomingFixtures(LEAGUE.EPL, SEASON).catch(() => []),
     getUpcomingFixtures(LEAGUE.UCL, SEASON).catch(() => []),
+    getUpcomingFixtures(LEAGUE.LALIGA, SEASON).catch(() => []),
+    getUpcomingFixtures(LEAGUE.BUNDESLIGA, SEASON).catch(() => []),
+    getUpcomingFixtures(LEAGUE.SERIE_A, SEASON).catch(() => []),
     Promise.all(nbaDateRange.map(d => getNBAGames(d).catch(() => []))).then(all => all.flat()),
     getLiveMatches().catch(() => []),
   ]);
@@ -131,8 +187,11 @@ export async function GET() {
   if (useApiSportsPrimary) {
     // API-Sports fixtures available — use as primary source
     const allApiFixtures = [
-      ...eplFixtures.slice(0, 10).map(f => ({ f, comp: "PL" })),
-      ...uclFixtures.slice(0, 10).map(f => ({ f, comp: "CL" })),
+      ...eplFixtures.slice(0, 8).map(f => ({ f, comp: "PL" })),
+      ...uclFixtures.slice(0, 8).map(f => ({ f, comp: "CL" })),
+      ...laligaFixtures.slice(0, 8).map(f => ({ f, comp: "LL" })),
+      ...bundesligaFixtures.slice(0, 8).map(f => ({ f, comp: "BL" })),
+      ...serieAFixtures.slice(0, 8).map(f => ({ f, comp: "SA" })),
     ];
 
     for (const { f, comp } of allApiFixtures) {
@@ -535,6 +594,51 @@ export async function GET() {
     }).map(p => p.catch(() => null))
   )).filter((r): r is MatchDataExtended & ReturnType<typeof applyEdge> => r !== null);
   results.push(...nbaResults);
+
+  // --- NRL: odds-only (no deep stats API) ---
+  const nrlOddsMatches = oddsMatches.filter(om => om.sport === "nrl");
+  const nrlResults = nrlOddsMatches.slice(0, 10).map((om) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bets = analyzeMatch({ sport: "soccer", homeTeam: om.homeTeam, awayTeam: om.awayTeam, homeOdds: om.homeOdds, awayOdds: om.awayOdds, homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, h2hDraws: 0, goalsAvgHome: 0, goalsAvgAway: 0, cornersAvgHome: 0, cornersAvgAway: 0, xgHome: 0, xgAway: 0, bttsProb: 0, cleanSheetHome: 0, cleanSheetAway: 0 } as any);
+    const edge = calcEdgeScore({ homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, homeTeam: om.homeTeam, awayTeam: om.awayTeam });
+    return {
+      id: `nrl-${om.id}`,
+      sport: "nrl" as const,
+      league: "NRL",
+      homeTeam: om.homeTeam,
+      awayTeam: om.awayTeam,
+      commenceTime: om.commenceTime,
+      homeOdds: om.homeOdds,
+      awayOdds: om.awayOdds,
+      homeForm: [],
+      awayForm: [],
+      goalsAvgHome: 0,
+      goalsAvgAway: 0,
+      h2hHomeWins: 0,
+      h2hTotal: 0,
+      h2hDraws: 0,
+      cornersAvgHome: 0,
+      cornersAvgAway: 0,
+      cardsAvgHome: 0,
+      cardsAvgAway: 0,
+      xgHome: 0,
+      xgAway: 0,
+      bttsProb: 0,
+      cleanSheetHome: 0,
+      cleanSheetAway: 0,
+      firstHalfGoalsAvg: 0,
+      varLikelihood: 0,
+      props: [],
+      ...edge,
+      bets,
+      bestOddsHome: om.bestOddsHome,
+      bestOddsHomeBook: om.bestOddsHomeBook,
+      bestOddsAway: om.bestOddsAway,
+      bestOddsAwayBook: om.bestOddsAwayBook,
+      allBookOdds: om.allBookOdds,
+    };
+  });
+  results.push(...nrlResults);
 
   results.sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 

@@ -2,7 +2,7 @@ import type { RefereeStat } from "./referees";
 
 export interface MatchData {
   id: string;
-  sport: "soccer" | "nba";
+  sport: "soccer" | "nba" | "nrl";
   league: string;
   homeTeam: string;
   awayTeam: string;
@@ -59,6 +59,9 @@ export interface MatchData {
   awayRecentForm?: string[];
   homeRecord?: import("./balldontlie").TeamSeasonRecord | null;
   awayRecord?: import("./balldontlie").TeamSeasonRecord | null;
+  // AI Reasoning
+  aiReasoning?: string;
+  aiHeadline?: string;
 }
 
 const T = () => Date.now();

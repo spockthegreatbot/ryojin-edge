@@ -22,6 +22,9 @@ function basketballHeaders() {
 export const LEAGUE = {
   EPL: 39,
   UCL: 2,
+  LALIGA: 140,
+  BUNDESLIGA: 78,
+  SERIE_A: 135,
 } as const;
 
 export const SEASON = 2025;

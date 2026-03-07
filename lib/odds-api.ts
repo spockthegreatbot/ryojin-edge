@@ -20,9 +20,13 @@ export interface OddsEvent {
 }
 
 const SPORTS = [
-  { key: "soccer_epl", label: "Premier League", sport: "soccer" as const },
-  { key: "soccer_uefa_champs_league", label: "Champions League", sport: "soccer" as const },
-  { key: "basketball_nba", label: "NBA", sport: "nba" as const },
+  { key: "soccer_epl",                  label: "Premier League",   sport: "soccer" as const },
+  { key: "soccer_uefa_champs_league",   label: "Champions League", sport: "soccer" as const },
+  { key: "soccer_spain_la_liga",        label: "La Liga",          sport: "soccer" as const },
+  { key: "soccer_germany_bundesliga",   label: "Bundesliga",       sport: "soccer" as const },
+  { key: "soccer_italy_serie_a",        label: "Serie A",          sport: "soccer" as const },
+  { key: "basketball_nba",              label: "NBA",              sport: "nba"    as const },
+  { key: "rugbyleague_nrl",             label: "NRL",              sport: "nrl"    as const },
 ];
 
 async function fetchEvents(sportKey: string): Promise<OddsEvent[]> {
@@ -42,7 +46,7 @@ async function fetchEvents(sportKey: string): Promise<OddsEvent[]> {
 
 export interface LiveMatch {
   id: string;
-  sport: "soccer" | "nba";
+  sport: "soccer" | "nba" | "nrl";
   league: string;
   homeTeam: string;
   awayTeam: string;

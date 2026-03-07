@@ -296,7 +296,7 @@ function LiveDot() {
 
 export default function Home() {
   const [matches, setMatches] = useState<Match[]>([]);
-  const [tab, setTab] = useState<"all" | "soccer" | "nba">("all");
+  const [tab, setTab] = useState<"all" | "soccer" | "nba" | "nrl">("all");
   const [loading, setLoading] = useState(true);
   const [updated, setUpdated] = useState("");
   const [winRate, setWinRate] = useState<number | null>(null);
@@ -341,6 +341,7 @@ export default function Home() {
   const strongEdges = allValueBets.filter((b) => b.tier === "🔥 Strong");
   const soccerCount = matches.filter((m) => m.sport === "soccer").length;
   const nbaCount = matches.filter((m) => m.sport === "nba").length;
+  const nrlCount = matches.filter((m) => m.sport === "nrl").length;
 
   // Nearest upcoming match for countdown
   const nextMatch = matches
@@ -449,6 +450,7 @@ export default function Home() {
               { key: "all", label: "All Matches", count: matches.length },
               { key: "soccer", label: "⚽ Soccer", count: soccerCount },
               { key: "nba", label: "🏀 NBA", count: nbaCount },
+              { key: "nrl", label: "🏉 NRL", count: nrlCount },
             ] as const).map(({ key, label, count }) => (
               <button
                 key={key}
