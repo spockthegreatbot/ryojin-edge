@@ -564,12 +564,14 @@ export function analyzeSoccer(match: {
 
 // ─── NBA analyzer ────────────────────────────────────────────────────────────
 
-export function analyzeNBA(match: {
+import type { InjuredPlayer, TeamSeasonRecord } from "./balldontlie";
+
+export interface NBAGameContext {
   homeTeam: string;
   awayTeam: string;
   homeOdds: number;
   awayOdds: number;
-  homeForm: string[];
+  homeForm: string[];   // last 5 (legacy compat)
   awayForm: string[];
   h2hHomeWins: number;
   h2hTotal: number;
@@ -577,34 +579,124 @@ export function analyzeNBA(match: {
   goalsAvgAway: number;
   homeElo?: number;
   awayElo?: number;
-}): BetSuggestion[] {
+  totalLine?: number;
+  // Smart context (from BallDontLie)
+  homeInjuries?: InjuredPlayer[];
+  awayInjuries?: InjuredPlayer[];
+  homeOnBackToBack?: boolean;
+  awayOnBackToBack?: boolean;
+  homeRecentForm?: string[]; // last 10 games
+  awayRecentForm?: string[];
+  homeRecord?: TeamSeasonRecord | null;
+  awayRecord?: TeamSeasonRecord | null;
+}
+
+// Injury impact per tier × status multiplier
+const INJURY_TIER_IMPACT: Record<InjuredPlayer["tier"], number> = {
+  superstar: 0.10,
+  allstar:   0.06,
+  starter:   0.025,
+  rotation:  0.008,
+  bench:     0.002,
+};
+const INJURY_STATUS_MULT: Record<InjuredPlayer["status"], number> = {
+  "Out":          1.0,
+  "Doubtful":     0.8,
+  "Questionable": 0.4,
+  "Day-To-Day":   0.2,
+};
+
+function injuryAdj(injuries: InjuredPlayer[]): number {
+  return injuries.reduce((sum, p) => {
+    return sum - INJURY_TIER_IMPACT[p.tier] * INJURY_STATUS_MULT[p.status];
+  }, 0);
+}
+
+function injuryLabel(injuries: InjuredPlayer[]): string[] {
+  return injuries
+    .filter(p => p.status === "Out" && (p.tier === "superstar" || p.tier === "allstar" || p.tier === "starter"))
+    .slice(0, 2)
+    .map(p => `🏥 ${p.name} ${p.status} (${p.tier})`);
+}
+
+export function analyzeNBA(match: NBAGameContext): BetSuggestion[] {
   const suggestions: BetSuggestion[] = [];
 
-  const homeF = formScore(match.homeForm);
-  const awayF = formScore(match.awayForm);
-  const formAdv = homeF - awayF;
-
-  const h2hTotal = Math.max(match.h2hTotal, 1);
-  const h2hHomeRate = match.h2hHomeWins / h2hTotal;
-
+  // ── STEP 1: De-vig market baseline ──
   const [marketHome, marketAway] = deVig([match.homeOdds, match.awayOdds]);
 
-  const ptsHome = match.goalsAvgHome || 112;
-  const ptsAway = match.goalsAvgAway || 108;
-  const totalPts = ptsHome + ptsAway;
+  // ── STEP 2: Adjustments ──
 
-  const homeElo = match.homeElo ?? 1500;
-  const awayElo = match.awayElo ?? 1500;
-  const eloWinHome = eloWinProb(homeElo, awayElo, 30); // NBA home advantage is smaller
+  // a) Injury impact
+  const homeInj = match.homeInjuries ?? [];
+  const awayInj = match.awayInjuries ?? [];
+  const homeInjAdj = injuryAdj(homeInj);
+  const awayInjAdj = injuryAdj(awayInj);
+  const netInjuryAdj = clamp(homeInjAdj - awayInjAdj, -0.12, 0.12);
+
+  // b) Back-to-back
+  const homeB2B = match.homeOnBackToBack ?? false;
+  const awayB2B = match.awayOnBackToBack ?? false;
+  const netB2BAdj = clamp(
+    (homeB2B ? -0.035 : 0) + (awayB2B ? 0.035 : 0),
+    -0.035, 0.035
+  );
+
+  // c) Recent form vs season baseline (last 10)
+  const homeL10 = match.homeRecentForm ?? match.homeForm ?? [];
+  const awayL10 = match.awayRecentForm ?? match.awayForm ?? [];
+  const homeFormRate = homeL10.filter(r => r === "W").length / Math.max(homeL10.length, 1);
+  const awayFormRate = awayL10.filter(r => r === "W").length / Math.max(awayL10.length, 1);
+  const homeSeasonWinPct = match.homeRecord?.winPct ?? marketHome;
+  const awaySeasonWinPct = match.awayRecord?.winPct ?? marketAway;
+  const netFormAdj = clamp(
+    ((homeFormRate - homeSeasonWinPct) - (awayFormRate - awaySeasonWinPct)) * 0.15,
+    -0.08, 0.08
+  );
+
+  // d) Home court boost
+  const homeWinPct = match.homeRecord?.winPct ?? 0;
+  const homeHomeWinPct = match.homeRecord?.homeWinPct ?? 0;
+  const homeCourtBoost = homeHomeWinPct > homeWinPct + 0.05 ? 0.015 : 0.005;
+
+  // ── STEP 3: Model probability ──
+  const totalAdj = netInjuryAdj + netB2BAdj + netFormAdj + homeCourtBoost;
+  const modelHome = clamp(marketHome + totalAdj, 0.05, 0.95);
+  const modelAway = 1 - modelHome;
+
+  // ── STEP 4: Edge ──
+  const edgeHome = modelHome - marketHome;
+  const edgeAway = modelAway - marketAway;
+
+  // ── STEP 5: Odds range filter (fixes "Brooklyn at 6.3 = hot pick" bug) ──
+  const NBA_MIN_ODDS = 1.25;
+  const NBA_MAX_ODDS = 4.50;
+  const homeOddsInRange = match.homeOdds >= NBA_MIN_ODDS && match.homeOdds <= NBA_MAX_ODDS;
+  const awayOddsInRange = match.awayOdds >= NBA_MIN_ODDS && match.awayOdds <= NBA_MAX_ODDS;
+
+  // ── STEP 6: Build factor labels ──
+  const homeFactors: string[] = [
+    ...injuryLabel(homeInj),
+    homeB2B ? `😴 ${match.homeTeam} on back-to-back (-3.5%)` : "",
+    homeL10.length >= 5 && Math.abs(homeFormRate - homeSeasonWinPct) > 0.1
+      ? `📈 ${match.homeTeam} L${homeL10.length}: ${homeL10.filter(r=>r==="W").length}W-${homeL10.filter(r=>r==="L").length}L`
+      : "",
+    match.homeRecord ? `📊 ${match.homeTeam} season: ${match.homeRecord.wins}W-${match.homeRecord.losses}L` : "",
+  ].filter(Boolean);
+
+  const awayFactors: string[] = [
+    ...injuryLabel(awayInj),
+    awayB2B ? `😴 ${match.awayTeam} on back-to-back (-3.5%)` : "",
+    awayL10.length >= 5 && Math.abs(awayFormRate - awaySeasonWinPct) > 0.1
+      ? `📉 ${match.awayTeam} L${awayL10.length}: ${awayL10.filter(r=>r==="W").length}W-${awayL10.filter(r=>r==="L").length}L`
+      : "",
+    match.awayRecord ? `📊 ${match.awayTeam} season: ${match.awayRecord.wins}W-${match.awayRecord.losses}L` : "",
+  ].filter(Boolean);
+
+  const kellyHome = quarterKelly(modelHome, match.homeOdds);
+  const kellyAway = quarterKelly(modelAway, match.awayOdds);
 
   // ── 1. Home Moneyline ──
-  const modelHome = clamp(
-    marketHome * 0.35 +
-    eloWinHome * 0.25 +
-    (0.5 + formAdv * 0.3) * 0.30 +
-    h2hHomeRate * 0.10
-  );
-  const edgeHome = modelHome - marketHome;
   suggestions.push({
     market: "Moneyline",
     pick: `${match.homeTeam} Win`,
@@ -613,16 +705,22 @@ export function analyzeNBA(match: {
     modelProb: modelHome,
     marketProb: marketHome,
     odds: match.homeOdds,
-    value: edgeHome >= 0.05,
+    value: Math.abs(edgeHome) >= 0.05 && homeOddsInRange && kellyHome > 0.02,
     tier: edgeTier(edgeHome),
-    reasoning: `Form: ${match.homeForm?.slice(-3).join("") || "—"} vs ${match.awayForm?.slice(-3).join("") || "—"}. Elo: ${homeElo}/${awayElo}. H2H: ${match.h2hHomeWins}/${h2hTotal}.`,
+    reasoning: [
+      `Market: ${Math.round(marketHome * 100)}% → Model: ${Math.round(modelHome * 100)}% (${edgeHome >= 0 ? "+" : ""}${(edgeHome * 100).toFixed(1)}% edge).`,
+      homeFactors.slice(0, 2).join(" "),
+    ].filter(Boolean).join(" "),
     kellySuggestion: formatKelly(modelHome, match.homeOdds),
-    factors: makeFactors(formAdv * 0.5, (eloWinHome - 0.5) * 1.5, (h2hHomeRate - 0.5) * 1.0, edgeHome),
+    factors: [
+      { label: "Injury delta", impact: clamp(netInjuryAdj * 5, -1, 1), direction: netInjuryAdj > 0.01 ? "+" : netInjuryAdj < -0.01 ? "-" : "=" },
+      { label: "Back-to-back", impact: clamp(netB2BAdj * 10, -1, 1), direction: netB2BAdj > 0 ? "+" : netB2BAdj < 0 ? "-" : "=" },
+      { label: "Recent form", impact: clamp(netFormAdj * 5, -1, 1), direction: netFormAdj > 0.01 ? "+" : netFormAdj < -0.01 ? "-" : "=" },
+      { label: "Home court", impact: homeCourtBoost * 20, direction: "+" },
+    ],
   });
 
   // ── 2. Away Moneyline ──
-  const modelAway = clamp(1 - modelHome);
-  const edgeAway = modelAway - marketAway;
   suggestions.push({
     market: "Moneyline",
     pick: `${match.awayTeam} Win`,
@@ -631,16 +729,27 @@ export function analyzeNBA(match: {
     modelProb: modelAway,
     marketProb: marketAway,
     odds: match.awayOdds,
-    value: edgeAway >= 0.05,
+    value: Math.abs(edgeAway) >= 0.05 && awayOddsInRange && kellyAway > 0.02,
     tier: edgeTier(edgeAway),
-    reasoning: `Away form: ${match.awayForm?.slice(-3).join("") || "—"}. Pts avg: ${ptsAway.toFixed(0)}/game.`,
+    reasoning: [
+      `Market: ${Math.round(marketAway * 100)}% → Model: ${Math.round(modelAway * 100)}% (${edgeAway >= 0 ? "+" : ""}${(edgeAway * 100).toFixed(1)}% edge).`,
+      awayFactors.slice(0, 2).join(" "),
+    ].filter(Boolean).join(" "),
     kellySuggestion: formatKelly(modelAway, match.awayOdds),
-    factors: makeFactors((awayF - homeF) * 0.5, (1 - eloWinHome - 0.5) * 1.5, (1 - h2hHomeRate - 0.5) * 1.0, edgeAway),
+    factors: [
+      { label: "Injury delta", impact: clamp(-netInjuryAdj * 5, -1, 1), direction: -netInjuryAdj > 0.01 ? "+" : -netInjuryAdj < -0.01 ? "-" : "=" },
+      { label: "Back-to-back", impact: clamp(-netB2BAdj * 10, -1, 1), direction: -netB2BAdj > 0 ? "+" : -netB2BAdj < 0 ? "-" : "=" },
+      { label: "Recent form", impact: clamp(-netFormAdj * 5, -1, 1), direction: -netFormAdj > 0.01 ? "+" : -netFormAdj < -0.01 ? "-" : "=" },
+      { label: "Away disadvantage", impact: -0.1, direction: "-" },
+    ],
   });
 
-  // ── 3. Total Points Over ──
-  const line = totalPts - 3;
-  const modelOver = clamp(totalPts > line + 2 ? 0.62 : totalPts > line ? 0.54 : 0.46);
+  // ── 3 & 4. Totals (use line from odds API if available) ──
+  const ptsHome = match.goalsAvgHome || 112;
+  const ptsAway = match.goalsAvgAway || 108;
+  const combinedAvg = ptsHome + ptsAway;
+  const line = match.totalLine ?? (combinedAvg - 3);
+  const modelOver = clamp(combinedAvg > line + 2 ? 0.62 : combinedAvg > line ? 0.54 : 0.46);
   const edgeOver = modelOver - 0.50;
   suggestions.push({
     market: "Total Points",
@@ -649,26 +758,23 @@ export function analyzeNBA(match: {
     edge: edgeOver,
     modelProb: modelOver,
     marketProb: 0.50,
-    value: edgeOver >= 0.05,
+    value: Math.abs(edgeOver) >= 0.05,
     tier: edgeTier(edgeOver),
-    reasoning: `Combined pts avg: ${totalPts.toFixed(0)}/game. Line implies ${line.toFixed(0)} pts.`,
+    reasoning: `Combined pts avg: ${combinedAvg.toFixed(0)}/game vs line ${line.toFixed(0)}.`,
     kellySuggestion: formatKelly(modelOver, 1.90),
   });
 
-  // ── 4. Total Points Under ──
-  const modelUnder = clamp(1 - modelOver);
-  const edgeUnder = modelUnder - 0.50;
   suggestions.push({
     market: "Total Points",
     pick: `Under ${line.toFixed(0)}.5`,
-    confidence: Math.round(modelUnder * 100),
-    edge: edgeUnder,
-    modelProb: modelUnder,
+    confidence: Math.round((1 - modelOver) * 100),
+    edge: (1 - modelOver) - 0.50,
+    modelProb: 1 - modelOver,
     marketProb: 0.50,
-    value: edgeUnder >= 0.05,
-    tier: edgeTier(edgeUnder),
-    reasoning: `${Math.round(modelUnder * 100)}% chance game stays under based on pace and defensive ratings.`,
-    kellySuggestion: formatKelly(modelUnder, 1.90),
+    value: Math.abs((1 - modelOver) - 0.50) >= 0.05,
+    tier: edgeTier((1 - modelOver) - 0.50),
+    reasoning: `${Math.round((1 - modelOver) * 100)}% chance of staying under based on pace/defence.`,
+    kellySuggestion: formatKelly(1 - modelOver, 1.90),
   });
 
   return suggestions.sort((a, b) => {
@@ -680,10 +786,9 @@ export function analyzeNBA(match: {
 // ─── Unified entry point ─────────────────────────────────────────────────────
 
 export function analyzeMatch(
-  match: Parameters<typeof analyzeSoccer>[0] & { sport: "soccer" | "nba" }
+  match: Parameters<typeof analyzeSoccer>[0] & Parameters<typeof analyzeNBA>[0] & { sport: "soccer" | "nba" }
 ): BetSuggestion[] {
-  // GUARD: Only calculate edge when we have real Pinnacle/market odds
-  // Without real odds, any edge number is fabricated and meaningless
+  // GUARD: Only calculate edge when we have real market odds
   const hasRealOdds = !!(match.homeOdds && match.homeOdds > 1);
   if (!hasRealOdds) return [];
 

@@ -13,6 +13,14 @@ import {
   SEASON,
 } from "@/lib/api-sports";
 import { teamEloFromPosition } from "@/lib/elo";
+import {
+  getTeamId as getBDLTeamId,
+  getTeamInjuries,
+  isTeamOnBackToBack,
+  getTeamRecentForm,
+  getTeamSeasonRecord,
+} from "@/lib/balldontlie";
+import type { InjuredPlayer, TeamSeasonRecord } from "@/lib/balldontlie";
 import { getRefereeStats } from "@/lib/referees";
 import { getTeamXG } from "@/lib/understat";
 import { getMatchWeather } from "@/lib/weather";
@@ -22,6 +30,15 @@ export interface MatchDataExtended extends MatchData {
   dataSourceApiSports?: boolean;
   dataSourceFootballData?: boolean;
   venue?: string;
+  // NBA smart context
+  homeInjuries?: InjuredPlayer[];
+  awayInjuries?: InjuredPlayer[];
+  homeOnBackToBack?: boolean;
+  awayOnBackToBack?: boolean;
+  homeRecentForm?: string[];
+  awayRecentForm?: string[];
+  homeRecord?: TeamSeasonRecord | null;
+  awayRecord?: TeamSeasonRecord | null;
 }
 
 function applyEdge(match: MatchDataExtended) {
@@ -447,15 +464,32 @@ export async function GET() {
     }));
   }
 
-  // --- NBA: API-Sports Basketball primary (next 7 days, pre-fetched above) ---
+  // --- NBA: enrich with BallDontLie (injuries, B2B, form, record) ---
   const nbaResults = await Promise.all(
-    nbaGames.slice(0, 15).map(async (game) => {
-      // Odds overlay (already fetched above)
+    nbaGames.slice(0, 10).map(async (game) => {
       const oddsMatch = oddsMatches.find(
         om => om.sport === "nba" &&
           teamsMatch(om.homeTeam, game.homeTeam) &&
           teamsMatch(om.awayTeam, game.awayTeam)
       );
+
+      // BDL enrichment — all parallel, all fail-safe
+      const [homeId, awayId] = await Promise.all([
+        getBDLTeamId(game.homeTeam).catch(() => null),
+        getBDLTeamId(game.awayTeam).catch(() => null),
+      ]);
+
+      const [homeInjuries, awayInjuries, homeB2B, awayB2B, homeForm, awayForm, homeRecord, awayRecord] =
+        await Promise.all([
+          homeId ? getTeamInjuries(homeId).catch(() => []) : Promise.resolve([]),
+          awayId ? getTeamInjuries(awayId).catch(() => []) : Promise.resolve([]),
+          homeId ? isTeamOnBackToBack(homeId).catch(() => false) : Promise.resolve(false),
+          awayId ? isTeamOnBackToBack(awayId).catch(() => false) : Promise.resolve(false),
+          homeId ? getTeamRecentForm(homeId).catch(() => []) : Promise.resolve([]),
+          awayId ? getTeamRecentForm(awayId).catch(() => []) : Promise.resolve([]),
+          homeId ? getTeamSeasonRecord(homeId).catch(() => null) : Promise.resolve(null),
+          awayId ? getTeamSeasonRecord(awayId).catch(() => null) : Promise.resolve(null),
+        ]);
 
       return applyEdge({
         id: `basketball-${game.id}`,
@@ -466,8 +500,8 @@ export async function GET() {
         commenceTime: game.date,
         homeOdds: oddsMatch?.homeOdds ?? 0,
         awayOdds: oddsMatch?.awayOdds ?? 0,
-        homeForm: [],
-        awayForm: [],
+        homeForm: homeForm.slice(0, 5),
+        awayForm: awayForm.slice(0, 5),
         goalsAvgHome: 0,
         goalsAvgAway: 0,
         h2hHomeWins: 0,
@@ -487,6 +521,16 @@ export async function GET() {
         props: [],
         dataSourceApiSports: true,
         dataSourceFootballData: false,
+        totalLine: oddsMatch?.totalLine,
+        // NBA smart context
+        homeInjuries,
+        awayInjuries,
+        homeOnBackToBack: homeB2B,
+        awayOnBackToBack: awayB2B,
+        homeRecentForm: homeForm,
+        awayRecentForm: awayForm,
+        homeRecord,
+        awayRecord,
       });
     })
   );

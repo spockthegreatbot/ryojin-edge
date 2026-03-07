@@ -48,6 +48,17 @@ export interface MatchData {
   bestOddsDraw?: number;
   bestOddsDrawBook?: string;
   allBookOdds?: { book: string; home: number; away: number; draw?: number }[];
+  // NBA totals line
+  totalLine?: number;
+  // NBA smart context (from BallDontLie)
+  homeInjuries?: import("./balldontlie").InjuredPlayer[];
+  awayInjuries?: import("./balldontlie").InjuredPlayer[];
+  homeOnBackToBack?: boolean;
+  awayOnBackToBack?: boolean;
+  homeRecentForm?: string[];
+  awayRecentForm?: string[];
+  homeRecord?: import("./balldontlie").TeamSeasonRecord | null;
+  awayRecord?: import("./balldontlie").TeamSeasonRecord | null;
 }
 
 const T = () => Date.now();
