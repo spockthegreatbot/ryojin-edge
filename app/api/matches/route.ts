@@ -3,7 +3,7 @@ import { MatchData } from "@/lib/mock-data";
 import { calcEdgeScore } from "@/lib/edge-calculator";
 import { getLiveMatches } from "@/lib/odds-api";
 import { getStandings, getUpcomingMatchesRange, enrichMatch } from "@/lib/football-data";
-import { analyzeMatch } from "@/lib/bet-analyzer";
+import { analyzeMatch, BetSuggestion } from "@/lib/bet-analyzer";
 import {
   getTeamStats,
   getFootballTeamId,
@@ -603,6 +603,59 @@ export async function GET() {
     }).map(p => p.catch(() => null))
   )).filter((r): r is MatchDataExtended & ReturnType<typeof applyEdge> => r !== null);
   results.push(...nbaResults);
+
+  // --- UFC/MMA: main card only (≥18 books = main card / co-main) ---
+  const ufcOddsMatches = oddsMatches
+    .filter(om => om.sport === "ufc" && om.bookCount >= 18)
+    .sort((a, b) => b.bookCount - a.bookCount)
+    .slice(0, 12);
+
+  const ufcResults = ufcOddsMatches.map(om => {
+    // Simple 2-outcome edge: de-vig odds vs raw implied
+    const implied = 1 / om.homeOdds + 1 / om.awayOdds;
+    const homeProb = (1 / om.homeOdds) / implied;
+    const awayProb = (1 / om.awayOdds) / implied;
+    const bets: BetSuggestion[] = [
+      {
+        market: "Fight Winner",
+        pick: om.homeOdds < om.awayOdds ? om.homeTeam : om.awayTeam,
+        edge: Math.abs(homeProb - awayProb) * 0.15,
+        modelProb: om.homeOdds < om.awayOdds ? homeProb : awayProb,
+        marketProb: om.homeOdds < om.awayOdds ? homeProb : awayProb,
+        odds: Math.min(om.homeOdds, om.awayOdds),
+        value: Math.min(om.homeOdds, om.awayOdds) >= 1.35,
+        confidence: Math.round(Math.max(homeProb, awayProb) * 100),
+        tier: om.bookCount >= 25 ? "🔥 Main Event" : "⚡ Co-Main",
+        kellySuggestion: "$5–15",
+        reasoning: `${om.bookCount} books covering. Favourite at ${Math.min(om.homeOdds, om.awayOdds).toFixed(2)}. Sharp consensus: ${Math.round(Math.max(homeProb,awayProb)*100)}% implied.`,
+      }
+    ];
+    return {
+      id: `ufc-${om.id}`,
+      sport: "ufc" as const,
+      league: "UFC/MMA",
+      homeTeam: om.homeTeam,
+      awayTeam: om.awayTeam,
+      commenceTime: om.commenceTime,
+      homeOdds: om.homeOdds,
+      awayOdds: om.awayOdds,
+      homeForm: [], awayForm: [],
+      goalsAvgHome: 0, goalsAvgAway: 0,
+      h2hHomeWins: 0, h2hTotal: 0, h2hDraws: 0,
+      cornersAvgHome: 0, cornersAvgAway: 0,
+      cardsAvgHome: 0, cardsAvgAway: 0,
+      xgHome: 0, xgAway: 0, bttsProb: 0,
+      cleanSheetHome: 0, cleanSheetAway: 0,
+      firstHalfGoalsAvg: 0, varLikelihood: 0, props: [],
+      bestOddsHome: om.bestOddsHome, bestOddsHomeBook: om.bestOddsHomeBook,
+      bestOddsAway: om.bestOddsAway, bestOddsAwayBook: om.bestOddsAwayBook,
+      allBookOdds: om.allBookOdds,
+      score: bets[0].value ? 72 : 55,
+      color: bets[0].value ? "green" as const : "yellow" as const,
+      bets,
+    };
+  });
+  results.push(...ufcResults);
 
   // --- NRL: odds-only (no deep stats API) ---
   const nrlOddsMatches = oddsMatches.filter(om => om.sport === "nrl");

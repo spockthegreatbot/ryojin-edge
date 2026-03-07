@@ -27,6 +27,7 @@ const SPORTS = [
   { key: "soccer_italy_serie_a",        label: "Serie A",          sport: "soccer" as const },
   { key: "basketball_nba",              label: "NBA",              sport: "nba"    as const },
   { key: "rugbyleague_nrl",             label: "NRL",              sport: "nrl"    as const },
+  { key: "mma_mixed_martial_arts",      label: "UFC/MMA",          sport: "ufc"    as const },
 ];
 
 async function fetchEvents(sportKey: string): Promise<OddsEvent[]> {
@@ -46,7 +47,7 @@ async function fetchEvents(sportKey: string): Promise<OddsEvent[]> {
 
 export interface LiveMatch {
   id: string;
-  sport: "soccer" | "nba" | "nrl";
+  sport: "soccer" | "nba" | "nrl" | "ufc";
   league: string;
   homeTeam: string;
   awayTeam: string;

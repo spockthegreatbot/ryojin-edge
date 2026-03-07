@@ -2,7 +2,7 @@ import type { RefereeStat } from "./referees";
 
 export interface MatchData {
   id: string;
-  sport: "soccer" | "nba" | "nrl";
+  sport: "soccer" | "nba" | "nrl" | "ufc";
   league: string;
   homeTeam: string;
   awayTeam: string;

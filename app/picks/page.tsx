@@ -60,7 +60,7 @@ interface ValueBet extends BetSuggestion {
   matchId: string;
   matchName: string;
   commenceTime: string;
-  sport: "soccer" | "nba" | "nrl";
+  sport: "soccer" | "nba" | "nrl" | "ufc";
   league: string;
 }
 

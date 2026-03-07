@@ -95,6 +95,7 @@ function ConfBar({ pct }: { pct: number }) {
 function sportLabel(m: Match): string {
   if (m.sport === "nba") return "🏀 NBA";
   if (m.sport === "nrl") return `🏉 ${m.league || "NRL"}`;
+  if (m.sport === "ufc") return `🥊 ${m.league || "UFC/MMA"}`;
   return `⚽ ${m.league || "Soccer"}`;
 }
 
@@ -484,7 +485,7 @@ function LiveDot() {
 
 export default function Home() {
   const [matches, setMatches] = useState<Match[]>([]);
-  const [tab, setTab] = useState<"all" | "soccer" | "nba" | "nrl">("all");
+  const [tab, setTab] = useState<"all" | "soccer" | "nba" | "nrl" | "ufc">("all");
   const [loading, setLoading] = useState(true);
   const [updated, setUpdated] = useState("");
   const [winRate, setWinRate] = useState<number | null>(null);
@@ -530,6 +531,7 @@ export default function Home() {
   const soccerCount = matches.filter((m) => m.sport === "soccer").length;
   const nbaCount = matches.filter((m) => m.sport === "nba").length;
   const nrlCount = matches.filter((m) => m.sport === "nrl").length;
+  const ufcCount = matches.filter((m) => m.sport === "ufc").length;
 
   // Nearest upcoming match for countdown
   const nextMatch = matches
@@ -639,6 +641,7 @@ export default function Home() {
               { key: "soccer", label: "⚽ Soccer", count: soccerCount },
               { key: "nba", label: "🏀 NBA", count: nbaCount },
               { key: "nrl", label: "🏉 NRL", count: nrlCount },
+              { key: "ufc", label: "🥊 UFC", count: ufcCount },
             ] as const).map(({ key, label, count }) => (
               <button
                 key={key}
