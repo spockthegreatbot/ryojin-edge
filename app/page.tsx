@@ -331,8 +331,8 @@ export default function Home() {
   useEffect(() => {
     fetchMatches();
     fetchStats();
-    const t = setInterval(fetchMatches, 300000);
-    const ts = setInterval(fetchStats, 600000);
+    const t = setInterval(fetchMatches, 3600000); // 1 hour — odds don't move faster than this
+    const ts = setInterval(fetchStats, 3600000); // 1 hour
     return () => { clearInterval(t); clearInterval(ts); };
   }, []);
 
