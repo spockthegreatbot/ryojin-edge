@@ -14,7 +14,13 @@ type Match = MatchData & {
   dataSourceFootballData?: boolean;
   weather?: MatchWeather | null;
   dataSource?: "xG" | "goals_avg";
+  aiHeadline?: string;
+  homeOnBackToBack?: boolean;
+  awayOnBackToBack?: boolean;
 };
+
+interface NewsItem { title: string; url: string; source: string; pubDate: string; }
+interface OddsMovement { homeDelta: number; awayDelta: number; firstSeen: string; }
 
 const EDGE_COLORS = { red: "#ef4444", yellow: "#eab308", green: "#22c55e" };
 
@@ -86,10 +92,129 @@ function ConfBar({ pct }: { pct: number }) {
   );
 }
 
+function sportLabel(m: Match): string {
+  if (m.sport === "nba") return "🏀 NBA";
+  if (m.sport === "nrl") return `🏉 ${m.league || "NRL"}`;
+  return `⚽ ${m.league || "Soccer"}`;
+}
+
+function evColor(ev: number): string {
+  return ev > 0.03 ? "#22c55e" : ev > 0 ? "#eab308" : "#ef4444";
+}
+
 function MatchCard({ m }: { m: Match }) {
   const topPick = m.bets?.find((b) => b.value) ?? m.bets?.[0] ?? null;
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [evOpen, setEvOpen] = useState(false);
+  const [evHome, setEvHome] = useState(m.homeOdds?.toFixed(2) ?? "");
+  const [evAway, setEvAway] = useState(m.awayOdds?.toFixed(2) ?? "");
+  const [evDraw, setEvDraw] = useState(m.drawOdds?.toFixed(2) ?? "");
+  const [movement, setMovement] = useState<OddsMovement | null>(null);
+
+  // Lazy news fetch
+  useEffect(() => {
+    if (!m.id) return;
+    const controller = new AbortController();
+    fetch(`/api/news/${m.id}`, { signal: controller.signal })
+      .then(r => r.ok ? r.json() : [])
+      .then((items: NewsItem[]) => setNews(items.slice(0, 2)))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [m.id]);
+
+  // Line movement via localStorage
+  useEffect(() => {
+    if (!m.homeOdds || m.homeOdds <= 1) return;
+    const key = `odds_${m.id}`;
+    const stored = localStorage.getItem(key);
+    const now = new Date().toISOString();
+    if (stored) {
+      try {
+        const prev = JSON.parse(stored) as { h: number; a: number; ts: string };
+        const homeDelta = parseFloat((m.homeOdds - prev.h).toFixed(3));
+        const awayDelta = parseFloat((m.awayOdds - prev.a).toFixed(3));
+        if (Math.abs(homeDelta) > 0.005 || Math.abs(awayDelta) > 0.005) {
+          setMovement({ homeDelta, awayDelta, firstSeen: prev.ts });
+        }
+        // Update stored value
+        localStorage.setItem(key, JSON.stringify({ h: m.homeOdds, a: m.awayOdds, ts: prev.ts }));
+      } catch { localStorage.removeItem(key); }
+    } else {
+      localStorage.setItem(key, JSON.stringify({ h: m.homeOdds, a: m.awayOdds, ts: now }));
+    }
+  }, [m.id, m.homeOdds, m.awayOdds]);
+
+  // EV calculation from user-input odds
+  const calcEV = (inputOdds: string, modelProb: number | undefined): { ev: number; valid: boolean } => {
+    const odds = parseFloat(inputOdds);
+    if (!odds || odds <= 1 || !modelProb) return { ev: 0, valid: false };
+    return { ev: parseFloat(((modelProb * odds) - 1).toFixed(4)), valid: true };
+  };
+  const homeModelProb = topPick?.pick?.includes(m.homeTeam) ? (topPick.modelProb) : (m.bets?.find(b => b.pick?.includes(m.homeTeam))?.modelProb);
+  const awayModelProb = m.bets?.find(b => b.pick?.includes(m.awayTeam))?.modelProb;
+  const drawModelProb = m.bets?.find(b => b.pick === "Draw")?.modelProb;
+  const evHomeResult = calcEV(evHome, homeModelProb);
+  const evAwayResult = calcEV(evAway, awayModelProb);
+  const evDrawResult = calcEV(evDraw, drawModelProb);
 
   return (
+    <div style={{ position: "relative" }}>
+      {/* EV Calculator panel — floats above the card */}
+      {evOpen && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
+            background: "#1a1a2e", borderRadius: 16,
+            border: "1px solid rgba(124,58,237,0.4)",
+            padding: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>🧮 EV Calculator</span>
+            <button onClick={() => setEvOpen(false)} style={{ background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+          </div>
+          <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>Enter your book&apos;s current odds to calculate expected value</div>
+          {[
+            { label: m.homeTeam, value: evHome, setter: setEvHome, result: evHomeResult },
+            ...(m.drawOdds ? [{ label: "Draw", value: evDraw, setter: setEvDraw, result: evDrawResult }] : []),
+            { label: m.awayTeam, value: evAway, setter: setEvAway, result: evAwayResult },
+          ].map(({ label, value, setter, result }) => (
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>{label}</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="number"
+                  value={value}
+                  onChange={e => setter(e.target.value)}
+                  placeholder="e.g. 2.10"
+                  step="0.05"
+                  style={{
+                    flex: 1, background: "#0a0a0f", border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 7, padding: "6px 10px", color: "white", fontSize: 13,
+                    outline: "none",
+                  }}
+                />
+                {result.valid && (
+                  <div style={{
+                    minWidth: 80, textAlign: "right",
+                    fontSize: 13, fontWeight: 700,
+                    color: evColor(result.ev),
+                  }}>
+                    EV {result.ev > 0 ? "+" : ""}{(result.ev * 100).toFixed(1)}%
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {evHomeResult.valid && (
+            <div style={{ marginTop: 8, fontSize: 11, color: "#6b7280", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8 }}>
+              Model probs: H {homeModelProb ? Math.round(homeModelProb * 100) : "—"}% / A {awayModelProb ? Math.round(awayModelProb * 100) : "—"}%{drawModelProb ? ` / D ${Math.round(drawModelProb * 100)}%` : ""}
+            </div>
+          )}
+        </div>
+      )}
+
     <Link href={`/match/${m.id}`} style={{ textDecoration: "none" }}>
       <div
         className="match-card"
@@ -124,8 +249,13 @@ function MatchCard({ m }: { m: Match }) {
               textTransform: "uppercase", letterSpacing: 1.5,
               background: "rgba(124,58,237,0.15)", padding: "3px 8px", borderRadius: 6,
             }}>
-              {m.sport === "soccer" ? `⚽ ${(m as Match & { league?: string }).league || "EPL"}` : "🏀 NBA"}
+              {sportLabel(m)}
             </span>
+            {(m.homeOnBackToBack || m.awayOnBackToBack) && (
+              <span style={{ fontSize: 10, color: "#f97316", background: "rgba(249,115,22,0.15)", padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>
+                😴 B2B
+              </span>
+            )}
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 12, color: "white", fontWeight: 600 }}>{formatKickoff(m.commenceTime).date}</div>
@@ -143,23 +273,37 @@ function MatchCard({ m }: { m: Match }) {
           <EdgeBadge score={m.score} color={m.color} />
         </div>
 
-        {/* Mini Odds: Home / Draw / Away */}
+        {/* Mini Odds: Home / Draw / Away — with line movement */}
         <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
           {[
-            { l: "H", v: m.homeOdds },
-            ...(m.drawOdds ? [{ l: "D", v: m.drawOdds }] : []),
-            { l: "A", v: m.awayOdds },
-          ].map(({ l, v }) => (
+            { l: "H", v: m.homeOdds, delta: movement?.homeDelta },
+            ...(m.drawOdds ? [{ l: "D", v: m.drawOdds, delta: undefined }] : []),
+            { l: "A", v: m.awayOdds, delta: movement?.awayDelta },
+          ].map(({ l, v, delta }) => (
             <div key={l} style={{
               flex: 1, background: "#0a0a0f", borderRadius: 7,
               padding: "6px 4px", textAlign: "center",
-              border: "1px solid rgba(255,255,255,0.05)",
+              border: `1px solid ${delta && delta < -0.02 ? "rgba(34,197,94,0.3)" : delta && delta > 0.02 ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.05)"}`,
+              position: "relative",
             }}>
               <div style={{ fontSize: 9, color: "#4b5563", marginBottom: 1 }}>{l}</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{v || "—"}</div>
+              {delta && Math.abs(delta) > 0.02 && (
+                <div style={{
+                  fontSize: 8, fontWeight: 700, marginTop: 1,
+                  color: delta < 0 ? "#22c55e" : "#ef4444",
+                }}>
+                  {delta < 0 ? `▼ ${Math.abs(delta).toFixed(2)}` : `▲ ${delta.toFixed(2)}`}
+                </div>
+              )}
             </div>
           ))}
         </div>
+        {movement && (
+          <div style={{ fontSize: 9, color: "#374151", marginTop: -8, marginBottom: 8, textAlign: "right" }}>
+            📈 Line moved since {new Date(movement.firstSeen).toLocaleDateString("en-AU", { month: "short", day: "numeric" })}
+          </div>
+        )}
 
         {/* No odds yet badge — shown when we have no real market data */}
         {(!m.homeOdds || m.homeOdds <= 1) && (!m.bets || m.bets.length === 0) && (
@@ -268,8 +412,52 @@ function MatchCard({ m }: { m: Match }) {
             </span>
           )}
         </div>
+
+        {/* AI headline */}
+        {m.aiHeadline && (
+          <div style={{ marginTop: 8, fontSize: 11, color: "#a78bfa", fontStyle: "italic", lineHeight: 1.4, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+            {m.aiHeadline}
+          </div>
+        )}
+
+        {/* Live news */}
+        {news.length > 0 && (
+          <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+            {news.map((n, i) => (
+              <a
+                key={i}
+                href={n.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={{ display: "block", marginBottom: i < news.length - 1 ? 6 : 0, textDecoration: "none" }}
+              >
+                <div style={{ fontSize: 11, color: "#d1d5db", lineHeight: 1.3, marginBottom: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  📰 {n.title}
+                </div>
+                <div style={{ fontSize: 9, color: "#4b5563" }}>{n.source}</div>
+              </a>
+            ))}
+          </div>
+        )}
+
+        {/* EV Calculator button */}
+        {m.homeOdds > 1 && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEvOpen(o => !o); }}
+            style={{
+              marginTop: 10, width: "100%", padding: "7px 0",
+              background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)",
+              borderRadius: 8, color: "#7c3aed", fontSize: 11, fontWeight: 700,
+              cursor: "pointer", letterSpacing: 0.5,
+            }}
+          >
+            🧮 Calculate EV at your book
+          </button>
+        )}
       </div>
     </Link>
+    </div>
   );
 }
 
