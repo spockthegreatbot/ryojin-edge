@@ -372,8 +372,8 @@ function MatchCard({ m }: { m: Match }) {
 
         {/* Footer: source badges + xG + weather + referee */}
         <div style={{ marginTop: "auto", paddingTop: 10, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          {/* xG badge */}
-          {m.dataSource === "xG" && m.xgHome > 0 && m.xgAway > 0 && (
+          {/* xG badge — soccer only */}
+          {m.sport === "soccer" && m.dataSource === "xG" && m.xgHome > 0 && m.xgAway > 0 && (
             <span style={{
               fontSize: 9, fontWeight: 700,
               color: "#7c3aed", background: "rgba(124,58,237,0.12)",

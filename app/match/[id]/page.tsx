@@ -329,6 +329,8 @@ export default function MatchPage({ params }: { params: { id: string } }) {
 
   const propReasonings: PropReasoning[] = buildPropReasoning(m);
   const isSoccer = m.sport === "soccer";
+  const isNRL = m.sport === "nrl";
+  const isUFC = m.sport === "ufc";
   const bets = analyzeMatch({ ...m });
   const valueBets = bets.filter((b) => b.value);
   const otherBets = bets.filter((b) => !b.value).slice(0, 3);
@@ -343,6 +345,19 @@ export default function MatchPage({ params }: { params: { id: string } }) {
         ["1st Half Goals Avg", m.firstHalfGoalsAvg, "—"],
         ["Clean Sheet %", m.cleanSheetHome ? `${m.cleanSheetHome}%` : 0, m.cleanSheetAway ? `${m.cleanSheetAway}%` : 0],
         ["VAR Likelihood", m.varLikelihood ? `${m.varLikelihood}%` : 0, "—"],
+      ]
+    : isNRL
+    ? [
+        ["League", "NRL", "NRL"],
+        ["Format", "80 min + Golden Point", "No draws"],
+        ["Avg Total Points", "~43 pts/game", "(season avg)"],
+        ["Scoring", "Try (4pt) + Conv (2pt)", "Penalty (2pt), Field Goal (1pt)"],
+      ]
+    : isUFC
+    ? [
+        ["Format", "3 rounds (5 for main)", "Title fights"],
+        ["Win methods", "KO/TKO, Sub, Dec", ""],
+        ["No draw", "Majority draw possible", "rare"],
       ]
     : [["Avg Points / Game", m.goalsAvgHome, m.goalsAvgAway]];
 
@@ -363,7 +378,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
                 background: "rgba(124,58,237,0.15)", padding: "3px 8px",
                 borderRadius: 6, display: "inline-block", marginBottom: 12,
               }}>
-                {isSoccer ? "⚽" : "🏀"} {m.league}
+                {isSoccer ? "⚽" : isNRL ? "🏉" : isUFC ? "🥊" : "🏀"} {m.league}
               </div>
               <div style={{ fontSize: 26, fontWeight: 800, color: "white" }}>{m.homeTeam}</div>
               <div style={{ color: "#4b5563", margin: "4px 0", fontSize: 13 }}>vs</div>
@@ -754,14 +769,14 @@ export default function MatchPage({ params }: { params: { id: string } }) {
           </Card>
         </Section>
 
-        {/* Prop Predictions */}
-        <Section title="📊 Prop Predictions">
+        {/* Prop Predictions — soccer only */}
+        {isSoccer && <Section title="📊 Prop Predictions">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
             {propReasonings.map((p) => (
               <PropCard key={p.prop} p={p} />
             ))}
           </div>
-        </Section>
+        </Section>}
 
         {/* Extra Soccer Stats */}
         {isSoccer && (
@@ -784,8 +799,8 @@ export default function MatchPage({ params }: { params: { id: string } }) {
           </Section>
         )}
 
-        {/* Team Form */}
-        <Section title="📈 Team Form (Last 5)">
+        {/* Team Form — hide for NRL/UFC (no form data) */}
+        {!isNRL && !isUFC && <Section title="📈 Team Form (Last 5)">
           <Card>
             {[
               [m.homeTeam, m.homeForm],
@@ -811,10 +826,10 @@ export default function MatchPage({ params }: { params: { id: string } }) {
               </div>
             ))}
           </Card>
-        </Section>
+        </Section>}
 
-        {/* H2H */}
-        <Section title="🆚 Head to Head">
+        {/* H2H — hide for NRL/UFC */}
+        {!isNRL && !isUFC && <Section title="🆚 Head to Head">
           <Card>
             <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center" }}>
               <div>
@@ -836,10 +851,10 @@ export default function MatchPage({ params }: { params: { id: string } }) {
               Last {m.h2hTotal} meetings
             </div>
           </Card>
-        </Section>
+        </Section>}
 
         {/* Season Stats */}
-        <Section title="📋 Season Stats">
+        <Section title={isNRL ? "🏉 NRL Match Info" : isUFC ? "🥊 Fight Info" : "📋 Season Stats"}>
           <div style={{ background: "#12121a", borderRadius: 14, border: "1px solid rgba(255,255,255,0.07)", overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
               <thead>

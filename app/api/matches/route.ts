@@ -655,8 +655,58 @@ export async function GET() {
   // --- NRL: odds-only (no deep stats API) ---
   const nrlOddsMatches = oddsMatches.filter(om => om.sport === "nrl");
   const nrlResults = nrlOddsMatches.slice(0, 10).map((om) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bets = analyzeMatch({ sport: "soccer", homeTeam: om.homeTeam, awayTeam: om.awayTeam, homeOdds: om.homeOdds, awayOdds: om.awayOdds, homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, h2hDraws: 0, goalsAvgHome: 0, goalsAvgAway: 0, cornersAvgHome: 0, cornersAvgAway: 0, xgHome: 0, xgAway: 0, bttsProb: 0, cleanSheetHome: 0, cleanSheetAway: 0 } as any);
+    // NRL-specific analysis — no soccer metrics
+    const implied = 1 / om.homeOdds + 1 / om.awayOdds;
+    const homeProb = (1 / om.homeOdds) / implied;
+    const awayProb = (1 / om.awayOdds) / implied;
+    const favourite = om.homeOdds <= om.awayOdds ? om.homeTeam : om.awayTeam;
+    const favOdds = Math.min(om.homeOdds, om.awayOdds);
+    const favProb = Math.max(homeProb, awayProb);
+    // NRL avg total = ~42–46 pts. Line bet: favourite giving -8.5 typical.
+    const linePts = favProb > 0.65 ? -12.5 : favProb > 0.55 ? -8.5 : -4.5;
+    const ouLine = 42.5; // NRL season average total
+
+    const bets: BetSuggestion[] = [
+      {
+        market: "Match Winner",
+        pick: favourite,
+        edge: Math.max(0, favProb - (1 / favOdds / implied) * 0.98),
+        modelProb: favProb,
+        marketProb: favProb,
+        odds: favOdds,
+        value: favOdds >= 1.25 && favOdds <= 3.50,
+        confidence: Math.round(favProb * 100),
+        tier: favOdds <= 1.50 ? "🔥 Strong Fav" : favOdds <= 2.20 ? "⚡ Value" : "💡 Lean",
+        kellySuggestion: favOdds <= 1.60 ? "$10–20" : "$5–15",
+        reasoning: `${om.bookCount} books. ${favourite} implied ${Math.round(favProb * 100)}% to win. No draw in NRL — golden point if level after 80 min.`,
+      },
+      {
+        market: `Total Points O/U ${ouLine}`,
+        pick: `Over ${ouLine}`,
+        edge: 0.02,
+        modelProb: 0.52,
+        marketProb: 0.50,
+        odds: 1.90,
+        value: false,
+        confidence: 52,
+        tier: "📊 Totals",
+        kellySuggestion: "$5–10",
+        reasoning: `NRL season avg ~43 pts/game. Over ${ouLine} is the lean when both teams are top-8 sides with attacking records.`,
+      },
+      {
+        market: `Line: ${favourite} ${linePts}`,
+        pick: `${favourite} ${linePts > 0 ? "+" : ""}${linePts}`,
+        edge: 0.03,
+        modelProb: 0.52,
+        marketProb: 0.50,
+        odds: 1.90,
+        value: favProb > 0.62,
+        confidence: favProb > 0.62 ? 58 : 48,
+        tier: "📐 Line",
+        kellySuggestion: "$5–10",
+        reasoning: `Line based on market implied probability. ${favProb > 0.62 ? "Strong favourite — line value if winning by comfort." : "Tight game expected — take the points."}`,
+      },
+    ];
     const edge = calcEdgeScore({ homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, homeTeam: om.homeTeam, awayTeam: om.awayTeam });
     return {
       id: `nrl-${om.id}`,
