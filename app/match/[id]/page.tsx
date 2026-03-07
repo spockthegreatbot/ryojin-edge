@@ -255,6 +255,10 @@ export default function MatchPage({ params }: { params: { id: string } }) {
   const [m, setM] = useState<MatchData | undefined>(MOCK_MATCHES.find((x) => x.id === params.id));
   const [news, setNews] = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
+  const [aiAnalysis, setAiAnalysis] = useState<string>("");
+  const [aiHeadlineLive, setAiHeadlineLive] = useState<string>("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(false);
 
   useEffect(() => {
     if (!m) {
@@ -270,7 +274,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
 
   // FIX 1: Pass team names as query params so news API can search without mock-data lookup
   useEffect(() => {
-    if (!m) return; // wait until match is loaded
+    if (!m) return;
     const qs = m.homeTeam && m.awayTeam
       ? `?home=${encodeURIComponent(m.homeTeam)}&away=${encodeURIComponent(m.awayTeam)}&league=${encodeURIComponent(m.league)}`
       : "";
@@ -279,6 +283,28 @@ export default function MatchPage({ params }: { params: { id: string } }) {
       .then((d) => { setNews(d); setNewsLoading(false); })
       .catch(() => setNewsLoading(false));
   }, [params.id, m]);
+
+  // Real AI analysis — called once match data loads
+  useEffect(() => {
+    if (!m || !m.homeOdds || m.homeOdds <= 1) return;
+    setAiLoading(true);
+    fetch(`/api/ai-analysis/${params.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(m),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.analysis) {
+          setAiAnalysis(d.analysis);
+          setAiHeadlineLive(d.headline ?? "");
+        } else {
+          setAiError(true);
+        }
+      })
+      .catch(() => setAiError(true))
+      .finally(() => setAiLoading(false));
+  }, [params.id, m?.homeOdds]);
 
   if (!m) {
     return (
@@ -663,29 +689,42 @@ export default function MatchPage({ params }: { params: { id: string } }) {
           </Section>
         )}
 
-        {/* AI Reasoning */}
-        {m.aiReasoning && (
-          <Section title="🤖 AI Match Analysis">
-            <Card>
-              {m.aiHeadline && (
-                <div style={{
-                  fontSize: 13, fontWeight: 700, color: "#a78bfa",
-                  marginBottom: 14, paddingBottom: 12,
-                  borderBottom: "1px solid rgba(167,139,250,0.15)",
-                  letterSpacing: 0.2,
-                }}>
-                  {m.aiHeadline}
-                </div>
-              )}
-              <div style={{
-                fontSize: 14, color: "#d1d5db", lineHeight: 1.75,
-                whiteSpace: "pre-wrap",
-              }}>
-                {m.aiReasoning}
+        {/* 🤖 Real AI Analysis — GPT-4o-mini + live news */}
+        <Section title="🤖 AI Match Analysis">
+          <Card>
+            {aiLoading && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#6b7280", padding: "8px 0" }}>
+                <div style={{ width: 16, height: 16, border: "2px solid #7c3aed", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+                <span style={{ fontSize: 13 }}>Analysing market data + live news…</span>
               </div>
-            </Card>
-          </Section>
-        )}
+            )}
+            {!aiLoading && aiError && (
+              <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>
+                {m.aiReasoning ?? "Analysis unavailable for this fixture."}
+              </div>
+            )}
+            {!aiLoading && aiAnalysis && (
+              <>
+                {aiHeadlineLive && (
+                  <div style={{
+                    fontSize: 13, fontWeight: 700, color: "#a78bfa",
+                    marginBottom: 14, paddingBottom: 12,
+                    borderBottom: "1px solid rgba(167,139,250,0.15)",
+                    letterSpacing: 0.2,
+                  }}>
+                    {aiHeadlineLive}
+                  </div>
+                )}
+                <div style={{ fontSize: 14, color: "#d1d5db", lineHeight: 1.8 }}>
+                  {aiAnalysis}
+                </div>
+                <div style={{ marginTop: 12, fontSize: 10, color: "#374151" }}>
+                  Powered by GPT-4o-mini · refreshes every 6h · based on live odds + news
+                </div>
+              </>
+            )}
+          </Card>
+        </Section>
 
         {/* Edge Reasoning */}
         <Section title="🧠 Edge Analysis">
