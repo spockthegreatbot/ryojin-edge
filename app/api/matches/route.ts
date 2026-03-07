@@ -190,9 +190,12 @@ export async function GET() {
 
   if (useApiSportsPrimary) {
     // API-Sports fixtures available — use as primary source
+    // ⚠️  API-Sports free tier = 100 req/day. Cap fixtures hard.
+    //     6 EPL + 4 UCL = 10 fixtures × 2 teams × 2 calls = 40 calls/cache-miss
+    //     + 2 fixture fetches = 42 max per hour. ~42/day with 1hr ISR cache.
     const allApiFixtures = [
-      ...eplFixtures.slice(0, 10).map(f => ({ f, comp: "PL" })),
-      ...uclFixtures.slice(0, 10).map(f => ({ f, comp: "CL" })),
+      ...eplFixtures.slice(0, 6).map(f => ({ f, comp: "PL" })),
+      ...uclFixtures.slice(0, 4).map(f => ({ f, comp: "CL" })),
     ];
 
     for (const { f, comp } of allApiFixtures) {
@@ -752,6 +755,6 @@ export async function GET() {
   results.sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 
   return NextResponse.json(results, {
-    headers: { "Cache-Control": "s-maxage=3600, stale-while-revalidate=7200" },
+    headers: { "Cache-Control": "s-maxage=10800, stale-while-revalidate=21600" },
   });
 }

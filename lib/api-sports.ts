@@ -235,7 +235,7 @@ export async function getUpcomingFixtures(
     const url = `${FOOTBALL_BASE}/fixtures?league=${leagueId}&season=${season}&from=${today}&to=${next14}`;
     const res = await fetch(url, {
       headers: footballHeaders(),
-      next: { revalidate: 3600 }, // 1h for fixtures
+      next: { revalidate: 21600 }, // 6h for fixtures — saves API quota
     });
 
     if (!res.ok) return [];
