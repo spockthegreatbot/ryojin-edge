@@ -465,7 +465,7 @@ export async function GET() {
   }
 
   // --- NBA: enrich with BallDontLie (injuries, B2B, form, record) ---
-  const nbaResults = await Promise.all(
+  const nbaResults = (await Promise.all(
     nbaGames.slice(0, 10).map(async (game) => {
       const oddsMatch = oddsMatches.find(
         om => om.sport === "nba" &&
@@ -532,8 +532,8 @@ export async function GET() {
         homeRecord,
         awayRecord,
       });
-    })
-  );
+    }).map(p => p.catch(() => null))
+  )).filter((r): r is MatchDataExtended & ReturnType<typeof applyEdge> => r !== null);
   results.push(...nbaResults);
 
   results.sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());

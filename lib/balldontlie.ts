@@ -161,8 +161,15 @@ export async function getTeamSeasonRecord(teamId: number): Promise<TeamSeasonRec
     );
     if (!res.ok) return null;
     const data = await res.json();
-    const standings = data.data ?? [];
-    const team = standings.find((s: { team: { id: number }; wins: number; losses: number; home_record?: string; road_record?: string }) => s.team?.id === teamId);
+    interface BDLStanding {
+      team: { id: number };
+      wins: number;
+      losses: number;
+      home_record?: string;
+      road_record?: string;
+    }
+    const standings: BDLStanding[] = data.data ?? [];
+    const team = standings.find((s) => s.team?.id === teamId);
     if (!team) return null;
 
     const totalGames = (team.wins + team.losses) || 1;

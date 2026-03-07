@@ -645,14 +645,17 @@ export function analyzeNBA(match: NBAGameContext): BetSuggestion[] {
   // c) Recent form vs season baseline (last 10)
   const homeL10 = match.homeRecentForm ?? match.homeForm ?? [];
   const awayL10 = match.awayRecentForm ?? match.awayForm ?? [];
+  // Guard: if NEITHER team has form data, emit 0 — don't create spurious edge from
+  // market-odds fallback being used as a season win-pct proxy.
+  const hasFormData = homeL10.length > 0 || awayL10.length > 0;
   const homeFormRate = homeL10.filter(r => r === "W").length / Math.max(homeL10.length, 1);
   const awayFormRate = awayL10.filter(r => r === "W").length / Math.max(awayL10.length, 1);
   const homeSeasonWinPct = match.homeRecord?.winPct ?? marketHome;
   const awaySeasonWinPct = match.awayRecord?.winPct ?? marketAway;
-  const netFormAdj = clamp(
+  const netFormAdj = hasFormData ? clamp(
     ((homeFormRate - homeSeasonWinPct) - (awayFormRate - awaySeasonWinPct)) * 0.15,
     -0.08, 0.08
-  );
+  ) : 0;
 
   // d) Home court boost
   const homeWinPct = match.homeRecord?.winPct ?? 0;
