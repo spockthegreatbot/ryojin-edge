@@ -21,10 +21,10 @@ export interface OddsEvent {
 
 const SPORTS = [
   { key: "soccer_epl",                  label: "Premier League",   sport: "soccer" as const },
+  { key: "soccer_fa_cup",               label: "FA Cup",           sport: "soccer" as const },
+  { key: "soccer_england_efl_cup",      label: "EFL Cup",          sport: "soccer" as const },
   { key: "soccer_uefa_champs_league",   label: "Champions League", sport: "soccer" as const },
-  { key: "soccer_spain_la_liga",        label: "La Liga",          sport: "soccer" as const },
-  { key: "soccer_germany_bundesliga",   label: "Bundesliga",       sport: "soccer" as const },
-  { key: "soccer_italy_serie_a",        label: "Serie A",          sport: "soccer" as const },
+  { key: "soccer_uefa_europa_league",   label: "Europa League",    sport: "soccer" as const },
   { key: "basketball_nba",              label: "NBA",              sport: "nba"    as const },
   { key: "rugbyleague_nrl",             label: "NRL",              sport: "nrl"    as const },
   { key: "mma_mixed_martial_arts",      label: "UFC/MMA",          sport: "ufc"    as const },

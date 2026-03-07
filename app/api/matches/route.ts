@@ -148,9 +148,7 @@ function teamsMatch(a: string, b: string): boolean {
 // Determine which league ID to use based on competition code
 function leagueIdForComp(comp: string): number {
   if (comp === "CL") return LEAGUE.UCL;
-  if (comp === "LL") return LEAGUE.LALIGA;
-  if (comp === "BL") return LEAGUE.BUNDESLIGA;
-  if (comp === "SA") return LEAGUE.SERIE_A;
+
   return LEAGUE.EPL;
 }
 
@@ -167,16 +165,13 @@ export async function GET() {
   });
 
   // Fetch all primary data sources in parallel
-  const [plMatches, clMatches, plStandings, clStandings, eplFixtures, uclFixtures, laligaFixtures, bundesligaFixtures, serieAFixtures, nbaGamesRaw, oddsMatches] = await Promise.all([
+  const [plMatches, clMatches, plStandings, clStandings, eplFixtures, uclFixtures, nbaGamesRaw, oddsMatches] = await Promise.all([
     getUpcomingMatchesRange("PL", dateFrom, dateTo).catch(() => []),
     getUpcomingMatchesRange("CL", dateFrom, dateTo).catch(() => []),
     getStandings("PL").catch(() => []),
     getStandings("CL").catch(() => []),
     getUpcomingFixtures(LEAGUE.EPL, SEASON).catch(() => []),
     getUpcomingFixtures(LEAGUE.UCL, SEASON).catch(() => []),
-    getUpcomingFixtures(LEAGUE.LALIGA, SEASON).catch(() => []),
-    getUpcomingFixtures(LEAGUE.BUNDESLIGA, SEASON).catch(() => []),
-    getUpcomingFixtures(LEAGUE.SERIE_A, SEASON).catch(() => []),
     Promise.all(nbaDateRange.map(d => getNBAGames(d).catch(() => []))).then(all => all.flat()),
     getLiveMatches().catch(() => []),
   ]);
@@ -196,11 +191,8 @@ export async function GET() {
   if (useApiSportsPrimary) {
     // API-Sports fixtures available — use as primary source
     const allApiFixtures = [
-      ...eplFixtures.slice(0, 8).map(f => ({ f, comp: "PL" })),
-      ...uclFixtures.slice(0, 8).map(f => ({ f, comp: "CL" })),
-      ...laligaFixtures.slice(0, 8).map(f => ({ f, comp: "LL" })),
-      ...bundesligaFixtures.slice(0, 8).map(f => ({ f, comp: "BL" })),
-      ...serieAFixtures.slice(0, 8).map(f => ({ f, comp: "SA" })),
+      ...eplFixtures.slice(0, 10).map(f => ({ f, comp: "PL" })),
+      ...uclFixtures.slice(0, 10).map(f => ({ f, comp: "CL" })),
     ];
 
     for (const { f, comp } of allApiFixtures) {
