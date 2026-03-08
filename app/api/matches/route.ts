@@ -805,6 +805,6 @@ export async function GET() {
   results.sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 
   return NextResponse.json(results, {
-    headers: { "Cache-Control": "s-maxage=21600, stale-while-revalidate=43200" },
+    headers: { "Cache-Control": "s-maxage=10800, stale-while-revalidate=21600" },
   });
 }
