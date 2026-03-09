@@ -26,9 +26,9 @@ interface RawPick {
   odds: number | null;
   tier: string | null;
   outcome: string | null;
-  kickoff: string;
-  recorded_at: string;
-  resolved_at: string | null;
+  kickoff: string | Date;
+  recorded_at: string | Date;
+  resolved_at: string | Date | null;
 }
 
 function emptyStats() {
@@ -152,7 +152,8 @@ export async function GET() {
     }
 
     for (const p of settledPicks) {
-      const day = (p.resolved_at ?? p.kickoff).split('T')[0];
+      const raw = p.resolved_at ?? p.kickoff;
+      const day = (raw instanceof Date ? raw.toISOString() : String(raw)).split('T')[0];
       if (day in dailyMap) {
         dailyMap[day] += calcResult(p.outcome!, p.odds);
       }
@@ -172,7 +173,8 @@ export async function GET() {
     // ── Monthly P&L ────────────────────────────────────────────────────────
     const monthMap: Record<string, number> = {};
     for (const p of settledPicks) {
-      const d = new Date(p.resolved_at ?? p.kickoff);
+      const raw = p.resolved_at ?? p.kickoff;
+      const d = raw instanceof Date ? raw : new Date(String(raw));
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       monthMap[key] = (monthMap[key] ?? 0) + calcResult(p.outcome!, p.odds);
     }
@@ -185,7 +187,7 @@ export async function GET() {
 
     // ── Enrich recentPicks with simulated result ────────────────────────────
     const recentPicks = (recentRows as RawPick[]).map((p) => ({
-      date: p.recorded_at,
+      date: p.recorded_at instanceof Date ? p.recorded_at.toISOString() : String(p.recorded_at),
       match: `${p.home_team} v ${p.away_team}`,
       market: p.market,
       pick: p.pick,
@@ -219,7 +221,6 @@ export async function GET() {
 
   } catch (e) {
     console.error('Stats API error:', e);
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ ...emptyStats(), _dbg: msg }, { headers: NO_STORE });
+    return NextResponse.json(emptyStats(), { headers: NO_STORE });
   }
 }
