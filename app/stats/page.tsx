@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 
 // ── Dynamic import — no SSR (Recharts uses browser APIs) ─────────────────────
@@ -159,6 +159,14 @@ export default function StatsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const [picksFilter, setPicksFilter] = useState<'all'|'wins'|'losses'|'pending'>('all');
+  const picksRef = useRef<HTMLDivElement>(null);
+
+  const scrollToPicksWithFilter = (filter: 'all'|'wins'|'losses'|'pending') => {
+    setPicksFilter(filter);
+    setTimeout(() => picksRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
   const ov = data?.overall;
   const hasData = (ov?.total ?? 0) > 0;
   const hasResolved = (ov?.wins ?? 0) + (ov?.losses ?? 0) > 0;
@@ -231,9 +239,9 @@ export default function StatsPage() {
             }
             {!loading && hasData && (
               <div style={{ marginTop: 8, display: "flex", gap: 12, fontSize: 12, color: "#6b7280" }}>
-                <span><span style={{ color: "#22c55e", fontWeight: 700 }}>{ov?.wins ?? 0}</span> won</span>
-                <span><span style={{ color: "#ef4444", fontWeight: 700 }}>{ov?.losses ?? 0}</span> lost</span>
-                <span><span style={{ color: "#6b7280", fontWeight: 700 }}>{ov?.pending ?? 0}</span> pending</span>
+                <span style={{ cursor: 'pointer' }} onClick={() => scrollToPicksWithFilter('wins')}><span style={{ color: "#22c55e", fontWeight: 700 }}>{ov?.wins ?? 0}</span> won ↓</span>
+                <span style={{ cursor: 'pointer' }} onClick={() => scrollToPicksWithFilter('losses')}><span style={{ color: "#ef4444", fontWeight: 700 }}>{ov?.losses ?? 0}</span> lost ↓</span>
+                <span style={{ cursor: 'pointer' }} onClick={() => scrollToPicksWithFilter('pending')}><span style={{ color: "#6b7280", fontWeight: 700 }}>{ov?.pending ?? 0}</span> pending ↓</span>
               </div>
             )}
           </Card>
@@ -392,9 +400,27 @@ export default function StatsPage() {
           </Card>
         </div>
 
-        {/* ── Latest Bets table ─────────────────────────────────────────── */}
+        {/* ── Pick Results table ─────────────────────────────────────────── */}
+        <div ref={picksRef} style={{ scrollMarginTop: 24 }}>
         <Card>
-          <CardTitle>Latest Bets</CardTitle>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+            <CardTitle style={{ marginBottom: 0 }}>Pick Results</CardTitle>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['all','wins','losses','pending'] as const).map(f => {
+                const counts = { all: data?.recentPicks.length ?? 0, wins: data?.recentPicks.filter(p => p.outcome === 'win').length ?? 0, losses: data?.recentPicks.filter(p => p.outcome === 'loss').length ?? 0, pending: data?.recentPicks.filter(p => !p.outcome).length ?? 0 };
+                const colors = { all: '#6b7280', wins: '#22c55e', losses: '#ef4444', pending: '#d29922' };
+                const active = picksFilter === f;
+                return (
+                  <button key={f} onClick={() => setPicksFilter(f)} style={{
+                    padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${active ? colors[f] : 'rgba(255,255,255,0.08)'}`,
+                    background: active ? `${colors[f]}20` : 'transparent', color: active ? colors[f] : '#6b7280', transition: 'all 0.15s',
+                  }}>
+                    {f.charAt(0).toUpperCase() + f.slice(1)} <span style={{ opacity: 0.7 }}>({counts[f]})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {loading ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {Array(5).fill(null).map((_, i) => (
@@ -420,7 +446,12 @@ export default function StatsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.recentPicks.map((pick, i) => (
+                  {data.recentPicks.filter(p => {
+                    if (picksFilter === 'wins') return p.outcome === 'win';
+                    if (picksFilter === 'losses') return p.outcome === 'loss';
+                    if (picksFilter === 'pending') return !p.outcome;
+                    return true;
+                  }).map((pick, i) => (
                     <tr key={i}>
                       <td style={{ color: "#6b7280", whiteSpace: "nowrap", fontSize: 12 }}>
                         {fmt(pick.date)}
@@ -467,6 +498,7 @@ export default function StatsPage() {
             </div>
           )}
         </Card>
+        </div>
 
       </div>
     </main>

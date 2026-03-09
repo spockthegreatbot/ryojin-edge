@@ -121,7 +121,7 @@ export async function GET() {
         SELECT home_team, away_team, league, market, pick, edge, odds, outcome,
                kickoff, recorded_at, resolved_at, tier
         FROM picks
-        ORDER BY recorded_at DESC LIMIT 30
+        ORDER BY recorded_at DESC LIMIT 500
       ` as unknown as Promise<RawPick[]>,
 
       // Feature 5: CLV stats
