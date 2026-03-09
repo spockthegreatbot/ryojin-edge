@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb, updateClosingOdds } from '@/lib/db';
-import { getLiveMatches } from '@/lib/odds-api';
+import { getFixtureOdds } from '@/lib/odds-apisports';
 
 export async function GET() {
   if (!process.env.DATABASE_URL) {
@@ -21,50 +21,45 @@ export async function GET() {
   const API_KEY = process.env.API_SPORTS_KEY!;
   let resolved = 0;
 
-  // Feature 5: Fetch current odds for CLV tracking (best-effort)
-  let oddsMatches: Awaited<ReturnType<typeof getLiveMatches>> = [];
-  try {
-    oddsMatches = await getLiveMatches();
-  } catch { /* non-fatal */ }
-
   for (const pick of pending) {
     try {
-      // Feature 5: Try to save closing odds (if within 1h of kickoff)
+      // Feature 5: Try to save closing odds via API-Sports fixture odds (best-effort)
       try {
         const kickoffTime = new Date(pick.kickoff as string).getTime();
         const now = Date.now();
         const diffMs = kickoffTime - now;
         if (diffMs <= 3600000 && diffMs >= -7200000) {
-          // Within the closing window — find current odds
-          const oddsMatch = oddsMatches.find(om => {
-            const home = (pick.home_team as string).toLowerCase();
-            const away = (pick.away_team as string).toLowerCase();
-            return om.homeTeam.toLowerCase().includes(home.split(' ')[0]) ||
-              om.awayTeam.toLowerCase().includes(away.split(' ')[0]);
-          });
+          // Within the closing window — fetch odds from API-Sports
+          const fixtureId = pick.match_id.startsWith('apisports-')
+            ? parseInt(pick.match_id.replace('apisports-', ''), 10)
+            : null;
 
-          if (oddsMatch) {
-            const market = (pick.market as string).toLowerCase();
-            const pickVal = (pick.pick as string).toLowerCase();
-            let closingOdds: number | undefined;
+          if (fixtureId) {
+            const fixtureOdds = await getFixtureOdds(fixtureId).catch(() => null);
 
-            if (market.includes('match result') || market.includes('1x2')) {
-              if (pickVal.includes('home') || pickVal.includes(pick.home_team as string)) {
-                closingOdds = oddsMatch.homeOdds;
-              } else if (pickVal.includes('away') || pickVal.includes(pick.away_team as string)) {
-                closingOdds = oddsMatch.awayOdds;
-              } else if (pickVal.includes('draw')) {
-                closingOdds = oddsMatch.drawOdds;
+            if (fixtureOdds) {
+              const market = (pick.market as string).toLowerCase();
+              const pickVal = (pick.pick as string).toLowerCase();
+              let closingOdds: number | undefined;
+
+              if (market.includes('match result') || market.includes('1x2')) {
+                if (pickVal.includes('home') || pickVal.includes((pick.home_team as string).toLowerCase())) {
+                  closingOdds = fixtureOdds.homeOdds;
+                } else if (pickVal.includes('away') || pickVal.includes((pick.away_team as string).toLowerCase())) {
+                  closingOdds = fixtureOdds.awayOdds;
+                } else if (pickVal.includes('draw')) {
+                  closingOdds = fixtureOdds.drawOdds;
+                }
               }
-            }
 
-            if (closingOdds && closingOdds > 1) {
-              await updateClosingOdds(
-                pick.match_id as string,
-                pick.market as string,
-                pick.pick as string,
-                closingOdds
-              );
+              if (closingOdds && closingOdds > 1) {
+                await updateClosingOdds(
+                  pick.match_id as string,
+                  pick.market as string,
+                  pick.pick as string,
+                  closingOdds
+                );
+              }
             }
           }
         }

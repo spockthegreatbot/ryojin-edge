@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { MatchData } from "@/lib/mock-data";
 import { calcEdgeScore } from "@/lib/edge-calculator";
-import { getLiveMatches } from "@/lib/odds-api";
 import { getStandings, getUpcomingMatchesRange, enrichMatch } from "@/lib/football-data";
-import { analyzeMatch, BetSuggestion } from "@/lib/bet-analyzer";
+import { analyzeMatch } from "@/lib/bet-analyzer";
 import {
   getTeamStats,
   getFootballTeamId,
@@ -13,7 +12,8 @@ import {
   SEASON,
 } from "@/lib/api-sports";
 import { teamEloFromPosition, getClubElo } from "@/lib/elo";
-import { getFixtureOdds } from "@/lib/odds-apisports";
+import { getLeagueOdds, getNBAOdds } from "@/lib/odds-apisports";
+import type { LeagueOddsMap, NBAOddsMap } from "@/lib/odds-apisports";
 import {
   getTeamId as getBDLTeamId,
   getTeamInjuries,
@@ -105,53 +105,15 @@ function applyEdge(match: MatchDataExtended) {
   return { ...match, ...edge, bets, aiReasoning, aiHeadline };
 }
 
-// Normalize team name for fuzzy matching against Odds API
-const TEAM_ALIASES: Record<string,string> = {
-  "münchen":"munich","munchen":"munich","atalanta bc":"atalanta",
-  "bayer 04 leverkusen":"leverkusen","bayer leverkusen":"leverkusen",
-  "paris saint-germain":"psg","paris saint germain":"psg","paris sg":"psg",
-  "brighton and hove albion":"brighton","wolverhampton wanderers":"wolves",
-  "tottenham hotspur":"tottenham","west ham united":"west ham",
-  "manchester united":"man united","manchester city":"man city",
-  "newcastle united":"newcastle","nottingham forest":"forest",
-  "borussia dortmund":"dortmund","rb leipzig":"leipzig",
-  "inter milan":"inter","ac milan":"milan","as roma":"roma",
-  "atletico madrid":"atletico","galatasaray":"galatasaray",
-};
-function normName(n:string):string {
-  const s = n.toLowerCase()
-    .replace(/[àáâãäå]/g,'a').replace(/[èéêë]/g,'e')
-    .replace(/[ìíîï]/g,'i').replace(/[òóôõöø]/g,'o')
-    .replace(/[ùúûü]/g,'u').replace(/ñ/g,'n').replace(/ç/g,'c')
-    .replace(/\b(fc|cf|afc|sc|ac)\b/g,'')
-    .replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-  return TEAM_ALIASES[s] ?? s;
-}
-
-function teamsMatch(a: string, b: string): boolean {
-  const na = normName(a);
-  const nb = normName(b);
-  if (na === nb) return true;
-  const wordsA = na.split(" ").filter(Boolean);
-  const wordsB = nb.split(" ").filter(Boolean);
-  // Significant word match (> 3 chars, not common filler)
-  const filler = new Set(["city","united","club","real","sport","athletic","union","inter","county"]);
-  const sigA = wordsA.filter(w => w.length > 3 && !filler.has(w));
-  const sigB = wordsB.filter(w => w.length > 3 && !filler.has(w));
-  // Any significant word from A appears in full B string or vice versa
-  if (sigA.some(w => nb.includes(w)) || sigB.some(w => na.includes(w))) return true;
-  // Short-name fallback: first word of each (handles "Bayern" vs "Bayern Munich")
-  const firstA = wordsA[0]; const firstB = wordsB[0];
-  if (firstA && firstB && firstA.length > 3 && (firstA === firstB || nb.startsWith(firstA) || na.startsWith(firstB))) return true;
-  return false;
-}
-
 // Determine which league ID to use based on competition code
 function leagueIdForComp(comp: string): number {
   if (comp === "CL") return LEAGUE.UCL;
+  if (comp === "EL") return 3; // Europa League
 
   return LEAGUE.EPL;
 }
+
+
 
 export async function GET() {
   const now = new Date();
@@ -165,16 +127,24 @@ export async function GET() {
     return d.toISOString().split("T")[0];
   });
 
-  // Fetch all primary data sources in parallel
-  const [plMatches, clMatches, plStandings, clStandings, eplFixtures, uclFixtures, nbaGamesRaw, oddsMatches] = await Promise.all([
+  // Europa League league ID
+  const EUROPA_LEAGUE_ID = 3;
+
+  // Fetch all primary data sources in parallel (no Odds API — using API-Sports odds)
+  const [plMatches, clMatches, plStandings, clStandings, eplFixtures, uclFixtures, europaFixtures, nbaGamesRaw, eplOddsMap, uclOddsMap, europaOddsMap, nbaOddsMap] = await Promise.all([
     getUpcomingMatchesRange("PL", dateFrom, dateTo).catch(() => []),
     getUpcomingMatchesRange("CL", dateFrom, dateTo).catch(() => []),
     getStandings("PL").catch(() => []),
     getStandings("CL").catch(() => []),
     getUpcomingFixtures(LEAGUE.EPL, SEASON).catch(() => []),
     getUpcomingFixtures(LEAGUE.UCL, SEASON).catch(() => []),
+    getUpcomingFixtures(EUROPA_LEAGUE_ID, SEASON).catch(() => []),
     Promise.all(nbaDateRange.map(d => getNBAGames(d).catch(() => []))).then(all => all.flat()),
-    getLiveMatches().catch(() => []),
+    // Bulk odds — 1 API call per league instead of per-fixture
+    getLeagueOdds(LEAGUE.EPL, SEASON).catch((): LeagueOddsMap => ({})),
+    getLeagueOdds(LEAGUE.UCL, SEASON).catch((): LeagueOddsMap => ({})),
+    getLeagueOdds(EUROPA_LEAGUE_ID, SEASON).catch((): LeagueOddsMap => ({})),
+    getNBAOdds().catch((): NBAOddsMap => ({})),
   ]);
 
   // Deduplicate NBA games by id
@@ -197,6 +167,7 @@ export async function GET() {
     const allApiFixtures = [
       ...eplFixtures.slice(0, 6).map(f => ({ f, comp: "PL" })),
       ...uclFixtures.slice(0, 4).map(f => ({ f, comp: "CL" })),
+      ...europaFixtures.slice(0, 4).map(f => ({ f, comp: "EL" })),
     ];
 
     for (const { f, comp } of allApiFixtures) {
@@ -258,13 +229,12 @@ export async function GET() {
       if (homeStanding) homeTablePos = homeStanding.position;
       if (awayStanding) awayTablePos = awayStanding.position;
 
-      // Fetch xG, weather, fixture odds, and clubelo all in parallel
+      // Fetch xG, weather, and clubelo in parallel (odds already bulk-fetched)
       const venue = (f as { venue?: string }).venue ?? "";
-      const [homeXG, awayXG, weather, fixtureOdds, homeClubElo, awayClubElo] = await Promise.all([
+      const [homeXG, awayXG, weather, homeClubElo, awayClubElo] = await Promise.all([
         getTeamXG(f.homeTeam).catch(() => null),
         getTeamXG(f.awayTeam).catch(() => null),
         getMatchWeather(venue, f.date).catch(() => null),
-        getFixtureOdds(f.id).catch(() => null),
         getClubElo(f.homeTeam).catch(() => null),
         getClubElo(f.awayTeam).catch(() => null),
       ]);
@@ -272,20 +242,13 @@ export async function GET() {
       const xgAway = awayXG?.xgFor ?? 0;
       const dataSource = (xgHome > 0 && xgAway > 0) ? "xG" as const : "goals_avg" as const;
 
-      // Odds: try Odds API match first, fall back to API-Sports fixture odds
+      // Odds: API-Sports bulk league odds (Bet365)
+      const oddsMap = comp === "CL" ? uclOddsMap : comp === "EL" ? europaOddsMap : eplOddsMap;
+      const fixtureOdds = oddsMap[f.id] ?? null;
       let homeOdds = 0;
       let awayOdds = 0;
       let drawOdds: number | undefined;
-      const oddsMatch = oddsMatches.find(
-        om => om.sport === "soccer" &&
-          teamsMatch(om.homeTeam, f.homeTeam) &&
-          teamsMatch(om.awayTeam, f.awayTeam)
-      );
-      if (oddsMatch) {
-        homeOdds = oddsMatch.homeOdds;
-        awayOdds = oddsMatch.awayOdds;
-        drawOdds = oddsMatch.drawOdds;
-      } else if (fixtureOdds) {
+      if (fixtureOdds) {
         homeOdds = fixtureOdds.homeOdds;
         awayOdds = fixtureOdds.awayOdds;
         drawOdds = fixtureOdds.drawOdds;
@@ -340,14 +303,6 @@ export async function GET() {
         homeTablePos,
         awayTablePos,
         dataSource,
-        // Feature 3: Best book odds
-        bestOddsHome: oddsMatch?.bestOddsHome,
-        bestOddsHomeBook: oddsMatch?.bestOddsHomeBook,
-        bestOddsAway: oddsMatch?.bestOddsAway,
-        bestOddsAwayBook: oddsMatch?.bestOddsAwayBook,
-        bestOddsDraw: oddsMatch?.bestOddsDraw,
-        bestOddsDrawBook: oddsMatch?.bestOddsDrawBook,
-        allBookOdds: oddsMatch?.allBookOdds,
       }));
     }
   }
@@ -450,20 +405,12 @@ export async function GET() {
     // Feature 2: Fetch weather (no venue from football-data.org, skip)
     const weather = null;
 
-    // Try to find odds from Odds API
-    let homeOdds = 0;
-    let awayOdds = 0;
-    let drawOdds: number | undefined;
-    const oddsMatch = oddsMatches.find(
-      om => om.sport === "soccer" &&
-        teamsMatch(om.homeTeam, match.homeTeam.name) &&
-        teamsMatch(om.awayTeam, match.awayTeam.name)
-    );
-    if (oddsMatch) {
-      homeOdds = oddsMatch.homeOdds;
-      awayOdds = oddsMatch.awayOdds;
-      drawOdds = oddsMatch.drawOdds;
-    }
+    // Odds from API-Sports bulk fetch (no per-fixture call needed)
+    // Note: football-data.org IDs don't match API-Sports fixture IDs
+    // So we can't look up odds directly — these fallback matches won't have odds
+    const homeOdds = 0;
+    const awayOdds = 0;
+    const drawOdds: number | undefined = undefined;
 
     // Compute Elo ratings — prefer ClubElo.com, fall back to standings position
     const totalTeams = standings.length || 20;
@@ -528,25 +475,14 @@ export async function GET() {
       homeTablePos,
       awayTablePos,
       dataSource: dataSourceFd,
-      // Feature 3: Best book odds
-      bestOddsHome: oddsMatch?.bestOddsHome,
-      bestOddsHomeBook: oddsMatch?.bestOddsHomeBook,
-      bestOddsAway: oddsMatch?.bestOddsAway,
-      bestOddsAwayBook: oddsMatch?.bestOddsAwayBook,
-      bestOddsDraw: oddsMatch?.bestOddsDraw,
-      bestOddsDrawBook: oddsMatch?.bestOddsDrawBook,
-      allBookOdds: oddsMatch?.allBookOdds,
     }));
   }
 
   // --- NBA: enrich with BallDontLie (injuries, B2B, form, record) ---
   const nbaResults = (await Promise.all(
     nbaGames.slice(0, 10).map(async (game) => {
-      const oddsMatch = oddsMatches.find(
-        om => om.sport === "nba" &&
-          teamsMatch(om.homeTeam, game.homeTeam) &&
-          teamsMatch(om.awayTeam, game.awayTeam)
-      );
+      // Get odds from API-Sports bulk NBA odds
+      const gameOdds = nbaOddsMap[game.id] ?? null;
 
       // BDL enrichment — all parallel, all fail-safe
       const [homeId, awayId] = await Promise.all([
@@ -573,8 +509,8 @@ export async function GET() {
         homeTeam: game.homeTeam,
         awayTeam: game.awayTeam,
         commenceTime: game.date,
-        homeOdds: oddsMatch?.homeOdds ?? 0,
-        awayOdds: oddsMatch?.awayOdds ?? 0,
+        homeOdds: gameOdds?.homeOdds ?? 0,
+        awayOdds: gameOdds?.awayOdds ?? 0,
         homeForm: homeForm.slice(0, 5),
         awayForm: awayForm.slice(0, 5),
         goalsAvgHome: 0,
@@ -596,7 +532,7 @@ export async function GET() {
         props: [],
         dataSourceApiSports: true,
         dataSourceFootballData: false,
-        totalLine: oddsMatch?.totalLine,
+        totalLine: gameOdds?.totalLine,
         // NBA smart context
         homeInjuries,
         awayInjuries,
@@ -611,208 +547,10 @@ export async function GET() {
   )).filter((r): r is MatchDataExtended & ReturnType<typeof applyEdge> => r !== null);
   results.push(...nbaResults);
 
-  // --- UFC/MMA: main card only (≥18 books = main card / co-main) ---
-  const ufcOddsMatches = oddsMatches
-    .filter(om => om.sport === "ufc" && om.bookCount >= 18)
-    .sort((a, b) => b.bookCount - a.bookCount)
-    .slice(0, 12);
-
-  const ufcResults = ufcOddsMatches.map(om => {
-    // Simple 2-outcome edge: de-vig odds vs raw implied
-    const implied = 1 / om.homeOdds + 1 / om.awayOdds;
-    const homeProb = (1 / om.homeOdds) / implied;
-    const awayProb = (1 / om.awayOdds) / implied;
-    const bets: BetSuggestion[] = [
-      {
-        market: "Fight Winner",
-        pick: om.homeOdds < om.awayOdds ? om.homeTeam : om.awayTeam,
-        edge: Math.abs(homeProb - awayProb) * 0.15,
-        modelProb: om.homeOdds < om.awayOdds ? homeProb : awayProb,
-        marketProb: om.homeOdds < om.awayOdds ? homeProb : awayProb,
-        odds: Math.min(om.homeOdds, om.awayOdds),
-        value: Math.min(om.homeOdds, om.awayOdds) >= 1.35,
-        confidence: Math.round(Math.max(homeProb, awayProb) * 100),
-        tier: om.bookCount >= 25 ? "🔥 Main Event" : "⚡ Co-Main",
-        kellySuggestion: "$5–15",
-        reasoning: `${om.bookCount} books covering. Favourite at ${Math.min(om.homeOdds, om.awayOdds).toFixed(2)}. Sharp consensus: ${Math.round(Math.max(homeProb,awayProb)*100)}% implied.`,
-      }
-    ];
-    return {
-      id: `ufc-${om.id}`,
-      sport: "ufc" as const,
-      league: "UFC/MMA",
-      homeTeam: om.homeTeam,
-      awayTeam: om.awayTeam,
-      commenceTime: om.commenceTime,
-      homeOdds: om.homeOdds,
-      awayOdds: om.awayOdds,
-      homeForm: [], awayForm: [],
-      goalsAvgHome: 0, goalsAvgAway: 0,
-      h2hHomeWins: 0, h2hTotal: 0, h2hDraws: 0,
-      cornersAvgHome: 0, cornersAvgAway: 0,
-      cardsAvgHome: 0, cardsAvgAway: 0,
-      xgHome: 0, xgAway: 0, bttsProb: 0,
-      cleanSheetHome: 0, cleanSheetAway: 0,
-      firstHalfGoalsAvg: 0, varLikelihood: 0, props: [],
-      bestOddsHome: om.bestOddsHome, bestOddsHomeBook: om.bestOddsHomeBook,
-      bestOddsAway: om.bestOddsAway, bestOddsAwayBook: om.bestOddsAwayBook,
-      allBookOdds: om.allBookOdds,
-      score: bets[0].value ? 72 : 55,
-      color: bets[0].value ? "green" as const : "yellow" as const,
-      bets,
-    };
-  });
-  results.push(...ufcResults);
-
-  // --- NRL: odds-only (no deep stats API) ---
-  const nrlOddsMatches = oddsMatches.filter(om => om.sport === "nrl");
-  const nrlResults = nrlOddsMatches.slice(0, 10).map((om) => {
-    // NRL-specific analysis — no soccer metrics
-    const implied = 1 / om.homeOdds + 1 / om.awayOdds;
-    const homeProb = (1 / om.homeOdds) / implied;
-    const awayProb = (1 / om.awayOdds) / implied;
-    const favourite = om.homeOdds <= om.awayOdds ? om.homeTeam : om.awayTeam;
-    const favOdds = Math.min(om.homeOdds, om.awayOdds);
-    const favProb = Math.max(homeProb, awayProb);
-    // NRL avg total = ~42–46 pts. Line bet: favourite giving -8.5 typical.
-    const linePts = favProb > 0.65 ? -12.5 : favProb > 0.55 ? -8.5 : -4.5;
-    const ouLine = 42.5; // NRL season average total
-
-    const bets: BetSuggestion[] = [
-      {
-        market: "Match Winner",
-        pick: favourite,
-        edge: Math.max(0, favProb - (1 / favOdds / implied) * 0.98),
-        modelProb: favProb,
-        marketProb: favProb,
-        odds: favOdds,
-        value: favOdds >= 1.25 && favOdds <= 3.50,
-        confidence: Math.round(favProb * 100),
-        tier: favOdds <= 1.50 ? "🔥 Strong Fav" : favOdds <= 2.20 ? "⚡ Value" : "💡 Lean",
-        kellySuggestion: favOdds <= 1.60 ? "$10–20" : "$5–15",
-        reasoning: `${om.bookCount} books. ${favourite} implied ${Math.round(favProb * 100)}% to win. No draw in NRL — golden point if level after 80 min.`,
-      },
-      {
-        market: `Total Points O/U ${ouLine}`,
-        pick: `Over ${ouLine}`,
-        edge: 0.02,
-        modelProb: 0.52,
-        marketProb: 0.50,
-        odds: 1.90,
-        value: false,
-        confidence: 52,
-        tier: "📊 Totals",
-        kellySuggestion: "$5–10",
-        reasoning: `NRL season avg ~43 pts/game. Over ${ouLine} is the lean when both teams are top-8 sides with attacking records.`,
-      },
-      {
-        market: `Line: ${favourite} ${linePts}`,
-        pick: `${favourite} ${linePts > 0 ? "+" : ""}${linePts}`,
-        edge: 0.03,
-        modelProb: 0.52,
-        marketProb: 0.50,
-        odds: 1.90,
-        value: favProb > 0.62,
-        confidence: favProb > 0.62 ? 58 : 48,
-        tier: "📐 Line",
-        kellySuggestion: "$5–10",
-        reasoning: `Line based on market implied probability. ${favProb > 0.62 ? "Strong favourite — line value if winning by comfort." : "Tight game expected — take the points."}`,
-      },
-    ];
-    const edge = calcEdgeScore({ homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, homeTeam: om.homeTeam, awayTeam: om.awayTeam });
-    return {
-      id: `nrl-${om.id}`,
-      sport: "nrl" as const,
-      league: "NRL",
-      homeTeam: om.homeTeam,
-      awayTeam: om.awayTeam,
-      commenceTime: om.commenceTime,
-      homeOdds: om.homeOdds,
-      awayOdds: om.awayOdds,
-      homeForm: [],
-      awayForm: [],
-      goalsAvgHome: 0,
-      goalsAvgAway: 0,
-      h2hHomeWins: 0,
-      h2hTotal: 0,
-      h2hDraws: 0,
-      cornersAvgHome: 0,
-      cornersAvgAway: 0,
-      cardsAvgHome: 0,
-      cardsAvgAway: 0,
-      xgHome: 0,
-      xgAway: 0,
-      bttsProb: 0,
-      cleanSheetHome: 0,
-      cleanSheetAway: 0,
-      firstHalfGoalsAvg: 0,
-      varLikelihood: 0,
-      props: [],
-      ...edge,
-      bets,
-      bestOddsHome: om.bestOddsHome,
-      bestOddsHomeBook: om.bestOddsHomeBook,
-      bestOddsAway: om.bestOddsAway,
-      bestOddsAwayBook: om.bestOddsAwayBook,
-      allBookOdds: om.allBookOdds,
-    };
-  });
-  results.push(...nrlResults);
-
-  // --- FALLBACK: Odds API soccer matches not matched to any stats fixture ---
-  // Collect all Odds API soccer match IDs that already appeared in results
-  const usedOddsIds = new Set(results.map(r => {
-    // Extract the odds match that was used for this result by matching teams
-    const om = oddsMatches.find(o =>
-      o.sport === "soccer" &&
-      teamsMatch(o.homeTeam, r.homeTeam) &&
-      teamsMatch(o.awayTeam, r.awayTeam)
-    );
-    return om?.id ?? null;
-  }).filter(Boolean));
-
-  const unmatchedSoccer = oddsMatches.filter(om =>
-    om.sport === "soccer" &&
-    om.homeOdds > 1 &&
-    !usedOddsIds.has(om.id)
-  );
-
-  const fallbackSoccer = unmatchedSoccer.slice(0, 20).map(om => {
-    const edge = calcEdgeScore({ homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, homeTeam: om.homeTeam, awayTeam: om.awayTeam });
-    const bets = analyzeMatch({
-      sport: "soccer", homeTeam: om.homeTeam, awayTeam: om.awayTeam,
-      homeOdds: om.homeOdds, awayOdds: om.awayOdds,
-      homeForm: [], awayForm: [], h2hHomeWins: 0, h2hTotal: 0, h2hDraws: 0,
-      goalsAvgHome: 0, goalsAvgAway: 0, cornersAvgHome: 0, cornersAvgAway: 0,
-      xgHome: 0, xgAway: 0, bttsProb: 0, cleanSheetHome: 0, cleanSheetAway: 0,
-    } as Parameters<typeof analyzeMatch>[0]);
-    return {
-      id: `odds-${om.id}`,
-      sport: "soccer" as const,
-      league: om.league,
-      homeTeam: om.homeTeam,
-      awayTeam: om.awayTeam,
-      commenceTime: om.commenceTime,
-      homeOdds: om.homeOdds,
-      awayOdds: om.awayOdds,
-      drawOdds: om.drawOdds,
-      homeForm: [], awayForm: [],
-      goalsAvgHome: 0, goalsAvgAway: 0,
-      h2hHomeWins: 0, h2hTotal: 0, h2hDraws: 0,
-      cornersAvgHome: 0, cornersAvgAway: 0,
-      cardsAvgHome: 0, cardsAvgAway: 0,
-      xgHome: 0, xgAway: 0, bttsProb: 0,
-      cleanSheetHome: 0, cleanSheetAway: 0,
-      firstHalfGoalsAvg: 0, varLikelihood: 0, props: [],
-      bestOddsHome: om.bestOddsHome, bestOddsHomeBook: om.bestOddsHomeBook,
-      bestOddsAway: om.bestOddsAway, bestOddsAwayBook: om.bestOddsAwayBook,
-      allBookOdds: om.allBookOdds,
-      ...edge,
-      bets,
-    };
-  });
-
-  results.push(...fallbackSoccer);
+  // --- UFC/MMA & NRL ---
+  // TODO: These sports need a new odds source (Cloudbet API key or alternative).
+  // The Odds API has been removed. NRL and UFC will return no matches until
+  // a new odds source is wired up. Cloudbet requires account + API key — escalated to Tolga.
 
   results.sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 
