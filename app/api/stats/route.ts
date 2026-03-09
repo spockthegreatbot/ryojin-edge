@@ -219,6 +219,7 @@ export async function GET() {
 
   } catch (e) {
     console.error('Stats API error:', e);
-    return NextResponse.json(emptyStats(), { headers: NO_STORE });
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ ...emptyStats(), _dbg: msg }, { headers: NO_STORE });
   }
 }
