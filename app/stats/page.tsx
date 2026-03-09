@@ -186,8 +186,7 @@ export default function StatsPage() {
 
       {/* ── Page header ──────────────────────────────────────────────── */}
       <div style={{
-        background: "linear-gradient(180deg, rgba(124,58,237,0.1) 0%, rgba(13,13,20,0) 100%)",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
         padding: "28px 24px 24px",
         marginBottom: 28,
       }}>
