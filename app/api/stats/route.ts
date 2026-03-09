@@ -67,8 +67,8 @@ export async function GET() {
             / NULLIF(COUNT(CASE WHEN outcome IN ('win','loss') THEN 1 END),0)
             * 100, 1
           )                                                                               AS win_rate,
-          ROUND(AVG(CASE WHEN outcome = 'win' THEN edge END) * 100, 1)                  AS avg_edge_wins,
-          ROUND(AVG(edge) * 100, 1)                                                      AS avg_edge_all
+          ROUND((AVG(CASE WHEN outcome = 'win' THEN edge END) * 100)::numeric, 1)        AS avg_edge_wins,
+          ROUND((AVG(edge) * 100)::numeric, 1)                                           AS avg_edge_all
         FROM picks
       `,
 
@@ -126,7 +126,7 @@ export async function GET() {
 
       // Feature 5: CLV stats
       sql`
-        SELECT ROUND(AVG(clv), 2) as avg_clv, COUNT(*)::int as clv_count
+        SELECT ROUND(AVG(clv)::numeric, 2) as avg_clv, COUNT(*)::int as clv_count
         FROM picks WHERE clv IS NOT NULL
       `,
     ]);
@@ -219,7 +219,6 @@ export async function GET() {
 
   } catch (e) {
     console.error('Stats API error:', e);
-    const errMsg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ ...emptyStats(), _error: errMsg }, { headers: NO_STORE });
+    return NextResponse.json(emptyStats(), { headers: NO_STORE });
   }
 }
