@@ -26,6 +26,7 @@ import { generateReasoning, generateHeadline } from "@/lib/ai-reasoning";
 import { getRefereeStats } from "@/lib/referees";
 import { getTeamXG } from "@/lib/understat";
 import { getMatchWeather } from "@/lib/weather";
+import { getNRLEvents, getUFCEvents } from "@/lib/cloudbet-odds";
 
 // Extended MatchData with data source flags
 export interface MatchDataExtended extends MatchData {
@@ -547,10 +548,82 @@ export async function GET() {
   )).filter((r): r is MatchDataExtended & ReturnType<typeof applyEdge> => r !== null);
   results.push(...nbaResults);
 
-  // --- UFC/MMA & NRL ---
-  // TODO: These sports need a new odds source (Cloudbet API key or alternative).
-  // The Odds API has been removed. NRL and UFC will return no matches until
-  // a new odds source is wired up. Cloudbet requires account + API key — escalated to Tolga.
+  // --- NRL: Cloudbet odds ---
+  try {
+    const nrlEvents = await getNRLEvents();
+    for (const ev of nrlEvents) {
+      results.push(applyEdge({
+        id: `cloudbet-nrl-${ev.id}`,
+        sport: "nrl",
+        league: "NRL",
+        homeTeam: ev.homeTeam,
+        awayTeam: ev.awayTeam,
+        commenceTime: ev.startTime ?? new Date().toISOString(),
+        homeOdds: ev.homeOdds,
+        awayOdds: ev.awayOdds,
+        drawOdds: ev.drawOdds,
+        homeForm: [],
+        awayForm: [],
+        goalsAvgHome: 0,
+        goalsAvgAway: 0,
+        h2hHomeWins: 0,
+        h2hTotal: 0,
+        h2hDraws: 0,
+        cornersAvgHome: 0,
+        cornersAvgAway: 0,
+        cardsAvgHome: 0,
+        cardsAvgAway: 0,
+        xgHome: 0,
+        xgAway: 0,
+        bttsProb: 0,
+        cleanSheetHome: 0,
+        cleanSheetAway: 0,
+        firstHalfGoalsAvg: 0,
+        varLikelihood: 0,
+        props: [],
+      }));
+    }
+  } catch (err) {
+    console.error("[matches] NRL Cloudbet fetch failed:", err);
+  }
+
+  // --- UFC/MMA: Cloudbet odds ---
+  try {
+    const ufcEvents = await getUFCEvents();
+    for (const ev of ufcEvents) {
+      results.push(applyEdge({
+        id: `cloudbet-ufc-${ev.id}`,
+        sport: "ufc",
+        league: ev.name.includes("PFL") ? "PFL" : "UFC",
+        homeTeam: ev.homeTeam,
+        awayTeam: ev.awayTeam,
+        commenceTime: ev.startTime ?? new Date().toISOString(),
+        homeOdds: ev.homeOdds,
+        awayOdds: ev.awayOdds,
+        homeForm: [],
+        awayForm: [],
+        goalsAvgHome: 0,
+        goalsAvgAway: 0,
+        h2hHomeWins: 0,
+        h2hTotal: 0,
+        h2hDraws: 0,
+        cornersAvgHome: 0,
+        cornersAvgAway: 0,
+        cardsAvgHome: 0,
+        cardsAvgAway: 0,
+        xgHome: 0,
+        xgAway: 0,
+        bttsProb: 0,
+        cleanSheetHome: 0,
+        cleanSheetAway: 0,
+        firstHalfGoalsAvg: 0,
+        varLikelihood: 0,
+        props: [],
+      }));
+    }
+  } catch (err) {
+    console.error("[matches] UFC Cloudbet fetch failed:", err);
+  }
 
   results.sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 
