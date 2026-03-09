@@ -3,5 +3,11 @@
     "app/api/proxy/clob/route.ts": {
       "regions": ["iad1"]
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/picks/resolve",
+      "schedule": "0 */6 * * *"
+    }
+  ]
 }

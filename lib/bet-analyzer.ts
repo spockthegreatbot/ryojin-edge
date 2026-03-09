@@ -91,10 +91,22 @@ function calcMotivation(match: {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// Exponential decay weights: most recent match × 1.0, -1 × 0.85, -2 × 0.72, -3 × 0.61, -4 × 0.52
+const FORM_WEIGHTS = [1.0, 0.85, 0.72, 0.61, 0.52];
+
 function formScore(form: string[]): number {
   if (!form?.length) return 0.5;
-  const score = form.reduce((s, r) => s + (r === "W" ? 1 : r === "D" ? 0.4 : 0), 0);
-  return score / form.length;
+  // form[last] = most recent — reverse so index 0 = most recent
+  const reversed = [...form].reverse();
+  let weightedSum = 0;
+  let totalWeight = 0;
+  for (let i = 0; i < reversed.length; i++) {
+    const w = FORM_WEIGHTS[i] ?? 0.44;
+    const score = reversed[i] === "W" ? 1 : reversed[i] === "D" ? 0.4 : 0;
+    weightedSum += score * w;
+    totalWeight += w;
+  }
+  return totalWeight > 0 ? weightedSum / totalWeight : 0.5;
 }
 
 function deVig(odds: number[]): number[] {
