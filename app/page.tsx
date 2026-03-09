@@ -70,11 +70,10 @@ function EdgeBadge({ score, color }: { score: number; color: keyof typeof EDGE_C
     <div style={{
       background: EDGE_COLORS[color],
       borderRadius: "50%",
-      width: 52, height: 52,
+      width: 46, height: 46,
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontWeight: 700, fontSize: 15, color: "#0a0a0f",
+      fontWeight: 700, fontSize: 14, color: "#0a0a0f",
       flexShrink: 0,
-      boxShadow: `0 0 14px ${EDGE_COLORS[color]}55`,
     }}>
       {score}
     </div>
@@ -83,7 +82,7 @@ function EdgeBadge({ score, color }: { score: number; color: keyof typeof EDGE_C
 
 function ConfBar({ pct }: { pct: number }) {
   return (
-    <div style={{ background: "#1e1e30", borderRadius: 4, height: 4, width: "100%", overflow: "hidden" }}>
+    <div style={{ background: "#1a1a26", borderRadius: 3, height: 3, width: "100%", overflow: "hidden" }}>
       <div style={{
         background: pct > 70 ? "#22c55e" : pct > 55 ? "#7c3aed" : "#eab308",
         width: `${pct}%`, height: "100%", transition: "width 0.3s",
@@ -166,9 +165,9 @@ function MatchCard({ m }: { m: Match }) {
           onClick={e => e.stopPropagation()}
           style={{
             position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
-            background: "#1a1a2e", borderRadius: 16,
-            border: "1px solid rgba(124,58,237,0.4)",
-            padding: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+            background: "#16161f", borderRadius: 14,
+            border: "1px solid rgba(124,58,237,0.3)",
+            padding: "14px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -220,12 +219,12 @@ function MatchCard({ m }: { m: Match }) {
       <div
         className="match-card"
         style={{
-          background: "#12121a",
-          borderRadius: 16,
-          border: "1px solid rgba(255,255,255,0.07)",
-          padding: "18px 16px",
+          background: "#111118",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.06)",
+          padding: "14px 14px",
           cursor: "pointer",
-          transition: "border-color 0.2s, box-shadow 0.2s, transform 0.1s",
+          transition: "border-color 0.2s",
           height: "100%",
           display: "flex",
           flexDirection: "column",
@@ -233,27 +232,25 @@ function MatchCard({ m }: { m: Match }) {
         }}
         onMouseEnter={(e) => {
           const el = e.currentTarget as HTMLDivElement;
-          el.style.borderColor = "rgba(124,58,237,0.4)";
-          el.style.boxShadow = "0 0 24px rgba(124,58,237,0.12)";
+          el.style.borderColor = "rgba(124,58,237,0.3)";
         }}
         onMouseLeave={(e) => {
           const el = e.currentTarget as HTMLDivElement;
-          el.style.borderColor = "rgba(255,255,255,0.07)";
-          el.style.boxShadow = "none";
+          el.style.borderColor = "rgba(255,255,255,0.06)";
         }}
       >
         {/* Sport + time */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
             <span style={{
-              fontSize: 11, color: "#7c3aed", fontWeight: 700,
-              textTransform: "uppercase", letterSpacing: 1.5,
-              background: "rgba(124,58,237,0.15)", padding: "3px 8px", borderRadius: 6,
+              fontSize: 10, color: "#a78bfa", fontWeight: 600,
+              textTransform: "uppercase", letterSpacing: 1,
+              background: "#1e1a2e", padding: "2px 7px", borderRadius: 4,
             }}>
               {sportLabel(m)}
             </span>
             {(m.homeOnBackToBack || m.awayOnBackToBack) && (
-              <span style={{ fontSize: 10, color: "#f97316", background: "rgba(249,115,22,0.15)", padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>
+              <span style={{ fontSize: 10, color: "#f97316", background: "#261c10", padding: "2px 6px", borderRadius: 4, fontWeight: 600 }}>
                 😴 B2B
               </span>
             )}
@@ -265,26 +262,26 @@ function MatchCard({ m }: { m: Match }) {
         </div>
 
         {/* Teams + Edge */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: 15, color: "white", marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.homeTeam}</div>
-            <div style={{ fontSize: 10, color: "#4b5563", fontWeight: 500, margin: "2px 0" }}>vs</div>
-            <div style={{ fontWeight: 800, fontSize: 15, color: "#d1d5db", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.awayTeam}</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "white", marginBottom: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.homeTeam}</div>
+            <div style={{ fontSize: 10, color: "#4b5563", fontWeight: 400, margin: "1px 0" }}>vs</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#d1d5db", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.awayTeam}</div>
           </div>
           <EdgeBadge score={m.score} color={m.color} />
         </div>
 
         {/* Mini Odds: Home / Draw / Away — with line movement */}
-        <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
           {[
             { l: "H", v: m.homeOdds, delta: movement?.homeDelta },
             ...(m.drawOdds ? [{ l: "D", v: m.drawOdds, delta: undefined }] : []),
             { l: "A", v: m.awayOdds, delta: movement?.awayDelta },
           ].map(({ l, v, delta }) => (
             <div key={l} style={{
-              flex: 1, background: "#0a0a0f", borderRadius: 7,
-              padding: "6px 4px", textAlign: "center",
-              border: `1px solid ${delta && delta < -0.02 ? "rgba(34,197,94,0.3)" : delta && delta > 0.02 ? "rgba(239,68,68,0.3)" : "rgba(255,255,255,0.05)"}`,
+              flex: 1, background: "#0d0d14", borderRadius: 6,
+              padding: "5px 4px", textAlign: "center",
+              border: `1px solid ${delta && delta < -0.02 ? "#1a3a2a" : delta && delta > 0.02 ? "#3a1a1a" : "rgba(255,255,255,0.04)"}`,
               position: "relative",
             }}>
               <div style={{ fontSize: 9, color: "#4b5563", marginBottom: 1 }}>{l}</div>
@@ -309,25 +306,25 @@ function MatchCard({ m }: { m: Match }) {
         {/* No odds yet badge — shown when we have no real market data */}
         {(!m.homeOdds || m.homeOdds <= 1) && (!m.bets || m.bets.length === 0) && (
           <div style={{
-            background: "rgba(107,114,128,0.08)",
-            borderRadius: 9,
-            border: "1px solid rgba(107,114,128,0.2)",
-            padding: "8px 10px",
-            marginBottom: 10,
+            background: "#15151e",
+            borderRadius: 6,
+            border: "1px solid rgba(255,255,255,0.04)",
+            padding: "6px 10px",
+            marginBottom: 8,
             textAlign: "center",
           }}>
-            <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>📊 No odds yet</span>
+            <span style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>📊 No odds yet</span>
           </div>
         )}
 
         {/* Top value pick inline (if any) */}
         {topPick && (
           <div style={{
-            background: topPick.value ? "rgba(34,197,94,0.07)" : "rgba(124,58,237,0.06)",
-            borderRadius: 9,
-            border: `1px solid ${topPick.value ? "rgba(34,197,94,0.2)" : "rgba(124,58,237,0.15)"}`,
-            padding: "8px 10px",
-            marginBottom: 10,
+            background: topPick.value ? "#0f1a14" : "#13121e",
+            borderRadius: 8,
+            border: `1px solid ${topPick.value ? "#1a3a2a" : "#1e1a2e"}`,
+            padding: "7px 10px",
+            marginBottom: 8,
           }}>
             <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>{topPick.market}</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -345,14 +342,14 @@ function MatchCard({ m }: { m: Match }) {
         {m.bets && m.bets.length > 1 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {m.bets.slice(1, 3).map((b, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0a0a0f", borderRadius: 7, padding: "6px 9px", border: "1px solid rgba(255,255,255,0.04)" }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0d0d14", borderRadius: 6, padding: "5px 8px", border: "1px solid rgba(255,255,255,0.03)" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 1 }}>{b.market}</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: b.value ? "#22c55e" : "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: b.value ? "#22c55e" : "white", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {b.pick}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: b.value ? "#22c55e" : "#6b7280", background: b.value ? "rgba(34,197,94,0.1)" : "rgba(107,114,128,0.1)", padding: "2px 6px", borderRadius: 4, marginLeft: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: b.value ? "#22c55e" : "#6b7280", background: b.value ? "#0f1a14" : "#15151e", padding: "2px 6px", borderRadius: 4, marginLeft: 6 }}>
                   {b.confidence}%
                 </span>
               </div>
@@ -375,10 +372,9 @@ function MatchCard({ m }: { m: Match }) {
           {/* xG badge — soccer only */}
           {m.sport === "soccer" && m.dataSource === "xG" && m.xgHome > 0 && m.xgAway > 0 && (
             <span style={{
-              fontSize: 9, fontWeight: 700,
-              color: "#7c3aed", background: "rgba(124,58,237,0.12)",
-              border: "1px solid rgba(124,58,237,0.25)",
-              padding: "1px 6px", borderRadius: 4,
+              fontSize: 9, fontWeight: 600,
+              color: "#a78bfa", background: "#1a182a",
+              padding: "1px 6px", borderRadius: 3,
             }}>
               📊 xG: {m.xgHome} | {m.xgAway}
             </span>
@@ -386,9 +382,9 @@ function MatchCard({ m }: { m: Match }) {
           {/* Weather badge */}
           {m.weather && (
             <span style={{
-              fontSize: 9, fontWeight: 600,
-              color: "#6b7280", background: "rgba(107,114,128,0.1)",
-              padding: "1px 6px", borderRadius: 4,
+              fontSize: 9, fontWeight: 500,
+              color: "#6b7280", background: "#15151e",
+              padding: "1px 6px", borderRadius: 3,
             }}>
               {m.weather.icon} {m.weather.tempC}°C
             </span>
@@ -396,12 +392,12 @@ function MatchCard({ m }: { m: Match }) {
           {(m.dataSourceApiSports || m.dataSourceFootballData) && (
             <>
               {m.dataSourceApiSports && (
-                <span style={{ fontSize: 9, color: "#374151", background: "rgba(55,65,81,0.15)", padding: "1px 5px", borderRadius: 3 }}>
+                <span style={{ fontSize: 9, color: "#4b5563", background: "#14141e", padding: "1px 5px", borderRadius: 3 }}>
                   📊 API-Sports
                 </span>
               )}
               {m.dataSourceFootballData && (
-                <span style={{ fontSize: 9, color: "#374151", background: "rgba(55,65,81,0.15)", padding: "1px 5px", borderRadius: 3 }}>
+                <span style={{ fontSize: 9, color: "#4b5563", background: "#14141e", padding: "1px 5px", borderRadius: 3 }}>
                   📅 fd.org
                 </span>
               )}
@@ -447,10 +443,10 @@ function MatchCard({ m }: { m: Match }) {
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEvOpen(o => !o); }}
             style={{
-              marginTop: 10, width: "100%", padding: "7px 0",
-              background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)",
-              borderRadius: 8, color: "#7c3aed", fontSize: 11, fontWeight: 700,
-              cursor: "pointer", letterSpacing: 0.5,
+              marginTop: 8, width: "100%", padding: "6px 0",
+              background: "#1a182a", border: "1px solid #252240",
+              borderRadius: 6, color: "#a78bfa", fontSize: 11, fontWeight: 600,
+              cursor: "pointer", letterSpacing: 0.3,
             }}
           >
             🧮 Calculate EV at your book
@@ -464,12 +460,12 @@ function MatchCard({ m }: { m: Match }) {
 
 function SkeletonCard() {
   return (
-    <div style={{ background: "#12121a", borderRadius: 16, border: "1px solid rgba(255,255,255,0.07)", padding: 20 }}>
+    <div style={{ background: "#111118", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)", padding: 16 }}>
       {[80, 120, 60, 40, 40, 40].map((w, i) => (
         <div key={i} style={{
-          background: "#1e1e30", borderRadius: 6,
-          height: i < 2 ? 18 : 12, width: `${w}%`,
-          marginBottom: 12, animation: "pulse 1.5s infinite",
+          background: "#1a1a24", borderRadius: 4,
+          height: i < 2 ? 16 : 10, width: `${w}%`,
+          marginBottom: 10, animation: "pulse 1.5s infinite",
         }} />
       ))}
     </div>
@@ -479,7 +475,7 @@ function SkeletonCard() {
 // ── Stats bar pulse dot ────────────────────────────────────────────────────
 function LiveDot() {
   return (
-    <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "#22c55e", marginRight: 4, boxShadow: "0 0 6px #22c55e", animation: "livePulse 1.4s ease-in-out infinite" }} />
+    <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#22c55e", marginRight: 4, animation: "livePulse 1.4s ease-in-out infinite" }} />
   );
 }
 
@@ -555,20 +551,20 @@ export default function Home() {
         @media (max-width: 560px)  { .match-grid { grid-template-columns: 1fr; } }
       `}</style>
 
-      {/* Hero header with gradient */}
+      {/* Hero header */}
       <div style={{
-        background: "linear-gradient(180deg, rgba(124,58,237,0.12) 0%, rgba(13,13,20,0) 100%)",
-        borderBottom: "1px solid rgba(255,255,255,0.05)",
-        padding: "28px 16px 0",
+        background: "#0d0d14",
+        borderBottom: "1px solid rgba(255,255,255,0.04)",
+        padding: "20px 16px 0",
         marginBottom: 0,
       }}>
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
             <div>
-              <h1 style={{ fontSize: 28, fontWeight: 800, color: "white", margin: "0 0 4px", letterSpacing: -0.5 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 700, color: "white", margin: "0 0 3px", letterSpacing: -0.3 }}>
                 🏆 TopBet Dashboard
               </h1>
-              <p style={{ color: "#6b7280", margin: 0, fontSize: 13 }}>
+              <p style={{ color: "#4b5563", margin: 0, fontSize: 12 }}>
                 Upcoming matches · Next 7 days · Live market analysis
               </p>
             </div>
@@ -581,11 +577,11 @@ export default function Home() {
           {!loading && (
             <div style={{
               display: "flex", gap: 0, flexWrap: "wrap",
-              background: "#12121a",
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.07)",
+              background: "#111118",
+              borderRadius: 10,
+              border: "1px solid rgba(255,255,255,0.05)",
               overflow: "hidden",
-              marginBottom: 20,
+              marginBottom: 16,
             }}>
               {[
                 {
@@ -618,14 +614,14 @@ export default function Home() {
                   key={label}
                   style={{
                     flex: flex ? "1 1 200px" : "0 0 auto",
-                    padding: "14px 18px",
-                    borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none",
+                    padding: "10px 14px",
+                    borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
                   }}
                 >
-                  <div style={{ fontSize: 10, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, color: "#4b5563", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 3 }}>
                     {icon} {label}
                   </div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color }}>
                     {i === 3 && countdown !== "LIVE" && countdown !== "" && <LiveDot />}
                     {value}
                   </div>
@@ -647,18 +643,18 @@ export default function Home() {
                 key={key}
                 onClick={() => setTab(key)}
                 style={{
-                  padding: "9px 18px",
-                  borderRadius: "10px 10px 0 0",
+                  padding: "7px 14px",
+                  borderRadius: "8px 8px 0 0",
                   border: "none",
                   cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  background: tab === key ? "#7c3aed" : "rgba(255,255,255,0.04)",
+                  fontWeight: tab === key ? 600 : 400,
+                  fontSize: 12,
+                  background: tab === key ? "#7c3aed" : "transparent",
                   color: tab === key ? "white" : "#6b7280",
                   transition: "all 0.15s",
                   display: "flex",
                   alignItems: "center",
-                  gap: 7,
+                  gap: 6,
                   position: "relative",
                   bottom: -1,
                 }}
@@ -667,8 +663,8 @@ export default function Home() {
                 {count > 0 && (
                   <span style={{
                     fontSize: 10,
-                    fontWeight: 700,
-                    background: tab === key ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
+                    fontWeight: 600,
+                    background: tab === key ? "rgba(255,255,255,0.2)" : "#1a1a24",
                     color: tab === key ? "white" : "#4b5563",
                     padding: "1px 6px",
                     borderRadius: 20,
@@ -685,7 +681,7 @@ export default function Home() {
       </div>
 
       {/* Main content */}
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px 0" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "18px 16px 0" }}>
         <div className="match-grid">
           {loading
             ? Array(8).fill(null).map((_, i) => <SkeletonCard key={i} />)
@@ -695,10 +691,10 @@ export default function Home() {
         {!loading && filtered.length === 0 && (
           <div style={{
             textAlign: "center",
-            padding: "80px 20px",
-            background: "#12121a",
-            borderRadius: 16,
-            border: "1px solid rgba(255,255,255,0.07)",
+            padding: "60px 20px",
+            background: "#111118",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.05)",
           }}>
             <div style={{
               fontSize: 40, marginBottom: 16,

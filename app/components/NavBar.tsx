@@ -7,24 +7,24 @@ export default function NavBar() {
   return (
     <nav
       style={{
-        background: "#12121a",
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
-        padding: "0 24px",
+        background: "#111118",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        padding: "0 20px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        height: 56,
+        height: 44,
         position: "sticky",
         top: 0,
         zIndex: 100,
       }}
     >
       <Link href="/" style={{ textDecoration: "none" }}>
-        <span style={{ fontWeight: 700, fontSize: 18, color: "white" }}>
+        <span style={{ fontWeight: 700, fontSize: 16, color: "white" }}>
           🏆 TopBet
         </span>
       </Link>
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 4 }}>
         {[
           { href: "/", label: "Dashboard" },
           { href: "/picks", label: "Picks 🎯" },
@@ -38,10 +38,10 @@ export default function NavBar() {
             href={href}
             style={{
               textDecoration: "none",
-              padding: "6px 14px",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 500,
+              padding: "4px 12px",
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: path === href ? 600 : 400,
               background: path === href ? "#7c3aed" : "transparent",
               color: path === href ? "white" : "#9ca3af",
             }}
