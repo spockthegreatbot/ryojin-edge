@@ -41,10 +41,10 @@ export async function getTeamXG(teamName: string): Promise<TeamXG | null> {
   if (!slug) return null;
 
   try {
-    const url = `https://understat.com/team/${slug}/2024`;
+    const url = `https://understat.com/team/${slug}/2025`;
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
-      next: { revalidate: 86400 }, // 24h cache
+      next: { revalidate: 21600 }, // 6h cache
     });
     if (!res.ok) return null;
 

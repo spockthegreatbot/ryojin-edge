@@ -27,6 +27,13 @@ interface Pick {
   tier: string;
   reasoning: string;
   kellySuggestion: string | null;
+  // xG context (Task 3)
+  homeXg?: number;
+  awayXg?: number;
+  // Elo context (Task 2)
+  eloHome?: number;
+  eloAway?: number;
+  eloGap?: number;
 }
 
 const CORS_HEADERS = {
@@ -70,6 +77,12 @@ export async function GET(request: Request) {
       // Only surface value bets (edge >= 0.05)
       if (!bet.value) continue;
 
+      const eloHome = match.homeElo ?? undefined;
+      const eloAway = match.awayElo ?? undefined;
+      const eloGap = (eloHome !== undefined && eloAway !== undefined)
+        ? Math.round(Math.abs(eloHome - eloAway))
+        : undefined;
+
       picks.push({
         matchId: match.id,
         homeTeam: match.homeTeam,
@@ -89,6 +102,11 @@ export async function GET(request: Request) {
         tier: bet.tier,
         reasoning: bet.reasoning,
         kellySuggestion: bet.kellySuggestion ?? null,
+        homeXg: match.xgHome > 0 ? match.xgHome : undefined,
+        awayXg: match.xgAway > 0 ? match.xgAway : undefined,
+        eloHome,
+        eloAway,
+        eloGap,
       });
     }
   }

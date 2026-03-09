@@ -12,7 +12,8 @@ import {
   LEAGUE,
   SEASON,
 } from "@/lib/api-sports";
-import { teamEloFromPosition } from "@/lib/elo";
+import { teamEloFromPosition, getClubElo } from "@/lib/elo";
+import { getFixtureOdds } from "@/lib/odds-apisports";
 import {
   getTeamId as getBDLTeamId,
   getTeamInjuries,
@@ -257,20 +258,21 @@ export async function GET() {
       if (homeStanding) homeTablePos = homeStanding.position;
       if (awayStanding) awayTablePos = awayStanding.position;
 
-      // Feature 1: Fetch xG from understat in parallel
-      const [homeXG, awayXG] = await Promise.all([
+      // Fetch xG, weather, fixture odds, and clubelo all in parallel
+      const venue = (f as { venue?: string }).venue ?? "";
+      const [homeXG, awayXG, weather, fixtureOdds, homeClubElo, awayClubElo] = await Promise.all([
         getTeamXG(f.homeTeam).catch(() => null),
         getTeamXG(f.awayTeam).catch(() => null),
+        getMatchWeather(venue, f.date).catch(() => null),
+        getFixtureOdds(f.id).catch(() => null),
+        getClubElo(f.homeTeam).catch(() => null),
+        getClubElo(f.awayTeam).catch(() => null),
       ]);
       const xgHome = homeXG?.xgFor ?? 0;
       const xgAway = awayXG?.xgFor ?? 0;
       const dataSource = (xgHome > 0 && xgAway > 0) ? "xG" as const : "goals_avg" as const;
 
-      // Feature 2: Fetch weather
-      const venue = (f as { venue?: string }).venue ?? "";
-      const weather = await getMatchWeather(venue, f.date).catch(() => null);
-
-      // Odds overlay
+      // Odds: try Odds API match first, fall back to API-Sports fixture odds
       let homeOdds = 0;
       let awayOdds = 0;
       let drawOdds: number | undefined;
@@ -283,11 +285,17 @@ export async function GET() {
         homeOdds = oddsMatch.homeOdds;
         awayOdds = oddsMatch.awayOdds;
         drawOdds = oddsMatch.drawOdds;
+      } else if (fixtureOdds) {
+        homeOdds = fixtureOdds.homeOdds;
+        awayOdds = fixtureOdds.awayOdds;
+        drawOdds = fixtureOdds.drawOdds;
       }
 
-      // Elo from standings
-      const homeElo = homeStanding ? teamEloFromPosition(homeStanding.position, totalTeams) : 1500;
-      const awayElo = awayStanding ? teamEloFromPosition(awayStanding.position, totalTeams) : 1500;
+      // Elo: prefer ClubElo.com real ratings, fall back to standings-position estimate
+      const posHomeElo = homeStanding ? teamEloFromPosition(homeStanding.position, totalTeams) : 1500;
+      const posAwayElo = awayStanding ? teamEloFromPosition(awayStanding.position, totalTeams) : 1500;
+      const homeElo = homeClubElo ?? posHomeElo;
+      const awayElo = awayClubElo ?? posAwayElo;
 
       // Referee stats
       const refereeStats = f.referee ? getRefereeStats(f.referee) : null;
@@ -457,16 +465,20 @@ export async function GET() {
       drawOdds = oddsMatch.drawOdds;
     }
 
-    // Compute Elo ratings from league table position
+    // Compute Elo ratings — prefer ClubElo.com, fall back to standings position
     const totalTeams = standings.length || 20;
     const homeStanding = standings.find((s) => s.team.id === match.homeTeam.id);
     const awayStanding = standings.find((s) => s.team.id === match.awayTeam.id);
-    const homeElo = homeStanding
+    const [fdHomeClubElo, fdAwayClubElo] = await Promise.all([
+      getClubElo(match.homeTeam.name).catch(() => null),
+      getClubElo(match.awayTeam.name).catch(() => null),
+    ]);
+    const homeElo = fdHomeClubElo ?? (homeStanding
       ? teamEloFromPosition(homeStanding.position, totalTeams)
-      : 1500;
-    const awayElo = awayStanding
+      : 1500);
+    const awayElo = fdAwayClubElo ?? (awayStanding
       ? teamEloFromPosition(awayStanding.position, totalTeams)
-      : 1500;
+      : 1500);
 
     // Referee intelligence
     const refName = (match.referees?.[0]?.name) ?? null;
