@@ -162,15 +162,16 @@ const CACHE_TTL = 6 * 3600 * 1000; // 6 hours
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { matchId: string } }
+  { params }: { params: Promise<{ matchId: string }> }
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "OpenAI key not configured" }, { status: 503 });
   }
 
+  const { matchId } = await params;
   const match: MatchInput = await req.json();
-  const cacheKey = `${params.matchId}_${match.homeOdds}_${match.awayOdds}`;
+  const cacheKey = `${matchId}_${match.homeOdds}_${match.awayOdds}`;
 
   // Serve from cache if fresh
   const cached = cache.get(cacheKey);

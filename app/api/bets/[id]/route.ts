@@ -4,7 +4,7 @@ import { getDb } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 interface RouteContext {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function PATCH(req: NextRequest, { params }: RouteContext) {
@@ -13,7 +13,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   }
 
   try {
-    const betId = parseInt(params.id);
+    const { id } = await params;
+    const betId = parseInt(id);
     const body = await req.json();
     const sql = getDb();
 
@@ -64,7 +65,8 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
   }
 
   try {
-    const betId = parseInt(params.id);
+    const { id } = await params;
+    const betId = parseInt(id);
     const sql = getDb();
     const rows = await sql`DELETE FROM bets WHERE id = ${betId} RETURNING id`;
 

@@ -53,8 +53,9 @@ function parseRSS(xml: string): NewsItem[] {
 
 export async function GET(
   req: Request,
-  { params }: { params: { matchId: string } }
+  { params }: { params: Promise<{ matchId: string }> }
 ) {
+  const { matchId } = await params;
   const { searchParams } = new URL(req.url);
   const home = searchParams.get("home") ?? "";
   const away = searchParams.get("away") ?? "";
@@ -71,7 +72,7 @@ export async function GET(
   }
   // Fallback: use matchId as-is if no team params provided
   if (queries.length === 0) {
-    queries.push(params.matchId.replace(/-/g, " "));
+    queries.push(matchId.replace(/-/g, " "));
   }
 
   const allItems: NewsItem[] = [];

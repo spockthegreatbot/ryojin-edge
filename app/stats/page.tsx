@@ -90,9 +90,9 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   );
 }
 
-function CardTitle({ children }: { children: React.ReactNode }) {
+function CardTitle({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 18 }}>
+    <div style={{ fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 18, ...style }}>
       {children}
     </div>
   );

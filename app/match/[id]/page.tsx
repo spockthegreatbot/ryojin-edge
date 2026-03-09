@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { MOCK_MATCHES, MatchData } from "@/lib/mock-data";
 import { calcEdgeScore, buildPropReasoning, PropReasoning, EdgeResult } from "@/lib/edge-calculator";
@@ -251,8 +251,9 @@ function AlgorithmExplainer({ bets, isSoccer }: { bets: BetSuggestion[]; isSocce
   );
 }
 
-export default function MatchPage({ params }: { params: { id: string } }) {
-  const [m, setM] = useState<MatchData | undefined>(MOCK_MATCHES.find((x) => x.id === params.id));
+export default function MatchPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const [m, setM] = useState<MatchData | undefined>(MOCK_MATCHES.find((x) => x.id === id));
   const [news, setNews] = useState<NewsItem[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState<string>("");
@@ -265,12 +266,12 @@ export default function MatchPage({ params }: { params: { id: string } }) {
       fetch("/api/matches")
         .then((r) => r.json())
         .then((matches: MatchData[]) => {
-          const found = matches.find((x) => x.id === params.id);
+          const found = matches.find((x) => x.id === id);
           if (found) setM(found);
         })
         .catch(() => {});
     }
-  }, [params.id, m]);
+  }, [id, m]);
 
   // FIX 1: Pass team names as query params so news API can search without mock-data lookup
   useEffect(() => {
@@ -278,18 +279,18 @@ export default function MatchPage({ params }: { params: { id: string } }) {
     const qs = m.homeTeam && m.awayTeam
       ? `?home=${encodeURIComponent(m.homeTeam)}&away=${encodeURIComponent(m.awayTeam)}&league=${encodeURIComponent(m.league)}`
       : "";
-    fetch(`/api/news/${params.id}${qs}`)
+    fetch(`/api/news/${id}${qs}`)
       .then((r) => r.json())
       .then((d) => { setNews(d); setNewsLoading(false); })
       .catch(() => setNewsLoading(false));
-  }, [params.id, m]);
+  }, [id, m]);
 
   // Real AI analysis — called once match data loads
   useEffect(() => {
     if (!m || !m.homeOdds || m.homeOdds <= 1) return;
     setAiLoading(true);
     const body = JSON.stringify(m);
-    fetch(`/api/ai-analysis/${params.id}`, {
+    fetch(`/api/ai-analysis/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,
@@ -306,7 +307,7 @@ export default function MatchPage({ params }: { params: { id: string } }) {
       .catch(() => setAiError(true))
       .finally(() => setAiLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id, m?.homeOdds]);
+  }, [id, m?.homeOdds]);
 
   if (!m) {
     return (
