@@ -587,10 +587,22 @@ export async function GET() {
     console.error("[matches] NRL Cloudbet fetch failed:", err);
   }
 
-  // --- UFC/MMA: Cloudbet odds ---
+  // --- UFC/MMA: Cloudbet odds + ESPN fighter stats ---
   try {
+    const { getFightStats } = await import("@/lib/espn-mma");
+    const { calcUFCEdge } = await import("@/lib/ufc-edge");
+
     const ufcEvents = await getUFCEvents();
     for (const ev of ufcEvents) {
+      // Fetch fighter stats in parallel from ESPN
+      const { f1: homeStats, f2: awayStats } = await getFightStats(ev.homeTeam, ev.awayTeam);
+
+      // Calculate UFC-specific edge
+      const ufcEdge = calcUFCEdge(homeStats, awayStats, ev.homeOdds, ev.awayOdds);
+
+      // Build edge percentage for display
+      const edgePct = ufcEdge ? ufcEdge.edge * 100 : 0;
+
       results.push(applyEdge({
         id: `cloudbet-ufc-${ev.id}`,
         sport: "ufc",
@@ -619,7 +631,9 @@ export async function GET() {
         firstHalfGoalsAvg: 0,
         varLikelihood: 0,
         props: [],
-      }));
+        ufcEdge,
+        edgePct,
+      } as never));
     }
   } catch (err) {
     console.error("[matches] UFC Cloudbet fetch failed:", err);
