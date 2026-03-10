@@ -3,6 +3,7 @@ import { BetSuggestion } from "@/lib/bet-analyzer";
 import { MatchData } from "@/lib/mock-data";
 import { getDb } from "@/lib/db";
 import { buildParlays } from "@/lib/parlays";
+import { sendPickAlert } from "@/lib/alerts";
 
 interface MatchWithBets extends MatchData {
   bets: BetSuggestion[];
@@ -113,6 +114,9 @@ export async function GET(request: Request) {
 
   // Sort by edge descending — highest value first
   picks.sort((a, b) => b.edge - a.edge);
+
+  // Fire alerts for high-edge picks (non-blocking)
+  picks.filter(p => p.edge >= 0.15 && p.odds !== null).forEach(p => sendPickAlert({ ...p, odds: p.odds! }).catch(() => {}));
 
   // ── Upsert picks to Neon DB (non-fatal) ──────────────────────────────────
   if (process.env.DATABASE_URL) {

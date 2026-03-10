@@ -32,11 +32,21 @@ export async function initSchema() {
     )
   `;
 
-  // Feature 5: CLV tracking columns (safe to run multiple times)
+  // CLV tracking columns
   try {
     await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS opening_odds FLOAT`;
     await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS closing_odds FLOAT`;
     await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS clv FLOAT`;
+  } catch {
+    // Columns may already exist — ignore
+  }
+
+  // Additional columns for auto-resolve, CLV API, and performance breakdown
+  try {
+    await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS fixture_id INTEGER`;
+    await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`;
+    await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS stake FLOAT DEFAULT 10`;
+    await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS result FLOAT`;
   } catch {
     // Columns may already exist — ignore
   }
