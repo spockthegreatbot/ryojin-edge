@@ -11,27 +11,74 @@ function formatKickoff(iso: string) {
   });
 }
 
+function tierColor(tier: string): string {
+  if (tier === "🎯 High Confidence") return "#60a5fa";
+  if (tier === "💰 Value Accumulator") return "#22c55e";
+  if (tier === "🚀 Power Parlay") return "#a855f7";
+  if (tier === "🌍 League Spread") return "#f59e0b";
+  return "#60a5fa";
+}
+
+function tierBg(tier: string): string {
+  if (tier === "🎯 High Confidence") return "rgba(96,165,250,0.12)";
+  if (tier === "💰 Value Accumulator") return "rgba(34,197,94,0.12)";
+  if (tier === "🚀 Power Parlay") return "rgba(168,85,247,0.12)";
+  if (tier === "🌍 League Spread") return "rgba(245,158,11,0.12)";
+  return "rgba(96,165,250,0.12)";
+}
+
+function tierBorder(tier: string): string {
+  if (tier === "🎯 High Confidence") return "rgba(96,165,250,0.3)";
+  if (tier === "💰 Value Accumulator") return "rgba(34,197,94,0.3)";
+  if (tier === "🚀 Power Parlay") return "rgba(168,85,247,0.3)";
+  if (tier === "🌍 League Spread") return "rgba(245,158,11,0.3)";
+  return "rgba(96,165,250,0.3)";
+}
+
 function TierBadge({ tier }: { tier: string }) {
-  const isPower = tier === "🔥🔥 Power Parlay";
-  const isStrong = tier === "🔥 Strong Parlay";
   return (
     <span
       style={{
         fontSize: 11,
         fontWeight: 700,
-        color: isPower ? "#a855f7" : isStrong ? "#22c55e" : "#60a5fa",
-        background: isPower
-          ? "rgba(168,85,247,0.12)"
-          : isStrong
-          ? "rgba(34,197,94,0.12)"
-          : "rgba(96,165,250,0.12)",
+        color: tierColor(tier),
+        background: tierBg(tier),
         padding: "3px 10px",
         borderRadius: 6,
-        border: `1px solid ${isPower ? "rgba(168,85,247,0.3)" : isStrong ? "rgba(34,197,94,0.3)" : "rgba(96,165,250,0.3)"}`,
+        border: `1px solid ${tierBorder(tier)}`,
         whiteSpace: "nowrap" as const,
       }}
     >
       {tier}
+    </span>
+  );
+}
+
+function StrategyChip({ strategy }: { strategy: Parlay['strategy'] }) {
+  const labels: Record<Parlay['strategy'], string> = {
+    'high-confidence': 'HIGH CONFIDENCE',
+    'value-accumulator': 'VALUE ACCUMULATOR',
+    'power-parlay': 'POWER PARLAY',
+    'league-spread': 'LEAGUE SPREAD',
+  };
+  const colors: Record<Parlay['strategy'], string> = {
+    'high-confidence': '#60a5fa',
+    'value-accumulator': '#22c55e',
+    'power-parlay': '#a855f7',
+    'league-spread': '#f59e0b',
+  };
+  return (
+    <span
+      style={{
+        fontSize: 9,
+        fontWeight: 800,
+        color: colors[strategy],
+        letterSpacing: 1.2,
+        textTransform: "uppercase" as const,
+        opacity: 0.7,
+      }}
+    >
+      {labels[strategy]}
     </span>
   );
 }
@@ -85,14 +132,14 @@ function LegRow({ leg, index }: { leg: ParlayLeg; index: number }) {
 }
 
 function ParlayCard({ parlay }: { parlay: Parlay }) {
-  const isPower = parlay.tier === "🔥🔥 Power Parlay";
-  const isStrong = parlay.tier === "🔥 Strong Parlay";
-  const borderColor = isPower
-    ? "rgba(168,85,247,0.4)"
-    : isStrong
-    ? "rgba(34,197,94,0.3)"
-    : "rgba(96,165,250,0.2)";
-  const leftBorder = isPower ? "#e8e0d0" : isStrong ? "#22c55e" : "#60a5fa";
+  const color = tierColor(parlay.tier);
+  const borderColor = parlay.tier === "🎯 High Confidence"
+    ? "rgba(96,165,250,0.25)"
+    : parlay.tier === "💰 Value Accumulator"
+    ? "rgba(34,197,94,0.25)"
+    : parlay.tier === "🚀 Power Parlay"
+    ? "rgba(168,85,247,0.3)"
+    : "rgba(245,158,11,0.25)";
 
   return (
     <div
@@ -100,20 +147,25 @@ function ParlayCard({ parlay }: { parlay: Parlay }) {
         background: "#141419",
         borderRadius: 2,
         border: `1px solid ${borderColor}`,
-        borderLeft: `4px solid ${leftBorder}`,
+        borderLeft: `4px solid ${color}`,
         padding: "16px 18px",
         display: "flex",
         flexDirection: "column",
         gap: 0,
       }}
     >
+      {/* Strategy chip */}
+      <div style={{ marginBottom: 6 }}>
+        <StrategyChip strategy={parlay.strategy} />
+      </div>
+
       {/* Header row */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 12,
+          marginBottom: 6,
           flexWrap: "wrap",
           gap: 8,
         }}
@@ -123,6 +175,21 @@ function ParlayCard({ parlay }: { parlay: Parlay }) {
         </div>
         <TierBadge tier={parlay.tier} />
       </div>
+
+      {/* Reason text */}
+      {parlay.reason && (
+        <div
+          style={{
+            fontSize: 12,
+            color: "#6b7280",
+            fontStyle: "italic",
+            marginBottom: 12,
+            lineHeight: 1.5,
+          }}
+        >
+          {parlay.reason}
+        </div>
+      )}
 
       {/* Legs */}
       <div style={{ marginBottom: 14 }}>
@@ -189,10 +256,27 @@ function ParlayCard({ parlay }: { parlay: Parlay }) {
 interface ParlayPayload {
   generated: string;
   parlays: Parlay[];
-  twoLeg: Parlay[];
-  threeLeg: Parlay[];
-  summary: { total: number; power: number; strong: number; value: number };
+  summary: {
+    total: number;
+    byStrategy: {
+      highConfidence: number;
+      valueAccumulator: number;
+      powerParlay: number;
+      leagueSpread: number;
+    };
+  };
 }
+
+const STRATEGY_SECTIONS: Array<{
+  key: Parlay['strategy'];
+  label: string;
+  color: string;
+}> = [
+  { key: 'high-confidence',  label: '🎯 High Confidence',   color: '#60a5fa' },
+  { key: 'value-accumulator', label: '💰 Value Accumulators', color: '#22c55e' },
+  { key: 'power-parlay',     label: '🚀 Power Parlays',      color: '#a855f7' },
+  { key: 'league-spread',    label: '🌍 League Spread',      color: '#f59e0b' },
+];
 
 export default function ParlaysPage() {
   const [data, setData] = useState<ParlayPayload | null>(null);
@@ -219,8 +303,8 @@ export default function ParlaysPage() {
     return () => clearInterval(interval);
   }, [fetchParlays]);
 
-  const twoLeg = data?.twoLeg ?? [];
-  const threeLeg = data?.threeLeg ?? [];
+  const byStrategy = (strategy: Parlay['strategy']) =>
+    (data?.parlays ?? []).filter(p => p.strategy === strategy).slice(0, 2);
 
   return (
     <main style={{ minHeight: "100vh", background: "#080808" }}>
@@ -289,21 +373,10 @@ export default function ParlaysPage() {
             }}
           >
             {[
-              {
-                label: "🔥🔥 Power",
-                value: data.summary.power,
-                color: "#a855f7",
-              },
-              {
-                label: "🔥 Strong",
-                value: data.summary.strong,
-                color: "#22c55e",
-              },
-              {
-                label: "✅ Value",
-                value: data.summary.value,
-                color: "#60a5fa",
-              },
+              { label: "🎯 High Confidence", value: data.summary.byStrategy.highConfidence,   color: "#60a5fa" },
+              { label: "💰 Value Accumulators", value: data.summary.byStrategy.valueAccumulator, color: "#22c55e" },
+              { label: "🚀 Power Parlays",    value: data.summary.byStrategy.powerParlay,     color: "#a855f7" },
+              { label: "🌍 League Spread",    value: data.summary.byStrategy.leagueSpread,    color: "#f59e0b" },
             ].map(({ label, value, color }) => (
               <div
                 key={label}
@@ -366,95 +439,52 @@ export default function ParlaysPage() {
           </div>
         ) : (
           <>
-            {/* 2-Leg Parlays */}
-            {twoLeg.length > 0 && (
-              <section style={{ marginBottom: 40 }}>
-                <h2
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: "#9ca3af",
-                    textTransform: "uppercase",
-                    letterSpacing: 1.2,
-                    marginBottom: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  2-Leg Parlays
-                  <span
+            {STRATEGY_SECTIONS.map(({ key, label, color }) => {
+              const section = byStrategy(key);
+              if (section.length === 0) return null;
+              return (
+                <section key={key} style={{ marginBottom: 40 }}>
+                  <h2
                     style={{
-                      fontSize: 11,
-                      background: "rgba(255,255,255,0.08)",
-                      padding: "2px 8px",
-                      borderRadius: 20,
-                      color: "#6b7280",
-                      fontWeight: 500,
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color,
+                      textTransform: "uppercase",
+                      letterSpacing: 1.2,
+                      marginBottom: 16,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
                     }}
                   >
-                    {twoLeg.length}
-                  </span>
-                </h2>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(380px, 1fr))",
-                    gap: 16,
-                  }}
-                >
-                  {twoLeg.map((p, i) => (
-                    <ParlayCard key={i} parlay={p} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* 3-Leg Parlays */}
-            {threeLeg.length > 0 && (
-              <section style={{ marginBottom: 40 }}>
-                <h2
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color: "#9ca3af",
-                    textTransform: "uppercase",
-                    letterSpacing: 1.2,
-                    marginBottom: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  3-Leg Parlays
-                  <span
+                    {label}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        background: "rgba(255,255,255,0.08)",
+                        padding: "2px 8px",
+                        borderRadius: 20,
+                        color: "#6b7280",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {section.length}
+                    </span>
+                  </h2>
+                  <div
                     style={{
-                      fontSize: 11,
-                      background: "rgba(255,255,255,0.08)",
-                      padding: "2px 8px",
-                      borderRadius: 20,
-                      color: "#6b7280",
-                      fontWeight: 500,
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))",
+                      gap: 16,
                     }}
                   >
-                    {threeLeg.length}
-                  </span>
-                </h2>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(420px, 1fr))",
-                    gap: 16,
-                  }}
-                >
-                  {threeLeg.map((p, i) => (
-                    <ParlayCard key={i} parlay={p} />
-                  ))}
-                </div>
-              </section>
-            )}
+                    {section.map((p, i) => (
+                      <ParlayCard key={i} parlay={p} />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
 
             {/* Info footer */}
             <div
@@ -468,10 +498,11 @@ export default function ParlaysPage() {
                 lineHeight: 1.7,
               }}
             >
-              <strong style={{ color: "#6b7280" }}>ℹ️ How parlays are built:</strong> We combine
-              the strongest individual value picks from separate matches. Edge
-              compounds when legs are uncorrelated. Kelly sizing is quartered for
-              parlay risk. Same-match legs are never combined.
+              <strong style={{ color: "#6b7280" }}>ℹ️ How parlays are built:</strong> Four distinct
+              strategies — High Confidence targets win probability, Value Accumulator maximises edge
+              across leagues, Power Parlay optimises risk/reward ratio, League Spread ensures
+              cross-competition diversity. Kelly sizing is quartered for parlay risk. Same-match legs
+              are never combined.
             </div>
           </>
         )}

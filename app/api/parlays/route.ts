@@ -55,9 +55,12 @@ export async function GET(request: Request) {
     threeLeg,
     summary: {
       total: parlays.length,
-      power: parlays.filter((p) => p.tier === "🔥🔥 Power Parlay").length,
-      strong: parlays.filter((p) => p.tier === "🔥 Strong Parlay").length,
-      value: parlays.filter((p) => p.tier === "✅ Value Parlay").length,
+      byStrategy: {
+        highConfidence: parlays.filter(p => p.strategy === 'high-confidence').length,
+        valueAccumulator: parlays.filter(p => p.strategy === 'value-accumulator').length,
+        powerParlay: parlays.filter(p => p.strategy === 'power-parlay').length,
+        leagueSpread: parlays.filter(p => p.strategy === 'league-spread').length,
+      },
     },
   };
 
