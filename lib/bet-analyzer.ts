@@ -299,9 +299,10 @@ export function analyzeSoccer(match: {
   const oddsArr = match.drawOdds
     ? [match.homeOdds, match.drawOdds, match.awayOdds]
     : [match.homeOdds, match.awayOdds];
+  const _deVig2 = match.drawOdds ? null : deVig([match.homeOdds, match.awayOdds]);
   const [marketHome, marketDraw, marketAway] = match.drawOdds
     ? deVig(oddsArr)
-    : [...deVig([match.homeOdds, match.awayOdds]), 0];
+    : [_deVig2![0], 0, _deVig2![1]];
 
   // Referee note (generated once, added to relevant picks)
   const refNote =

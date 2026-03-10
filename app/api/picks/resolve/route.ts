@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb, updateClosingOdds } from '@/lib/db';
-import { getFixtureOdds } from '@/lib/odds-apisports';
+import { getDb } from '@/lib/db';
 
 export async function GET() {
   if (!process.env.DATABASE_URL) {
@@ -23,47 +22,6 @@ export async function GET() {
 
   for (const pick of pending) {
     try {
-      // Feature 5: Try to save closing odds via API-Sports fixture odds (best-effort)
-      try {
-        const kickoffTime = new Date(pick.kickoff as string).getTime();
-        const now = Date.now();
-        const diffMs = kickoffTime - now;
-        if (diffMs <= 3600000 && diffMs >= -7200000) {
-          // Within the closing window — fetch odds from API-Sports
-          const fixtureId = pick.match_id.startsWith('apisports-')
-            ? parseInt(pick.match_id.replace('apisports-', ''), 10)
-            : null;
-
-          if (fixtureId) {
-            const fixtureOdds = await getFixtureOdds(fixtureId).catch(() => null);
-
-            if (fixtureOdds) {
-              const market = (pick.market as string).toLowerCase();
-              const pickVal = (pick.pick as string).toLowerCase();
-              let closingOdds: number | undefined;
-
-              if (market.includes('match result') || market.includes('1x2')) {
-                if (pickVal.includes('home') || pickVal.includes((pick.home_team as string).toLowerCase())) {
-                  closingOdds = fixtureOdds.homeOdds;
-                } else if (pickVal.includes('away') || pickVal.includes((pick.away_team as string).toLowerCase())) {
-                  closingOdds = fixtureOdds.awayOdds;
-                } else if (pickVal.includes('draw')) {
-                  closingOdds = fixtureOdds.drawOdds;
-                }
-              }
-
-              if (closingOdds && closingOdds > 1) {
-                await updateClosingOdds(
-                  pick.match_id as string,
-                  pick.market as string,
-                  pick.pick as string,
-                  closingOdds
-                );
-              }
-            }
-          }
-        }
-      } catch { /* CLV update non-fatal */ }
       // Extract fixture ID from match_id (format: "apisports-12345")
       const fixtureId = pick.match_id.startsWith('apisports-')
         ? pick.match_id.replace('apisports-', '')

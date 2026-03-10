@@ -63,9 +63,10 @@ export async function getFixtureOdds(fixtureId: number): Promise<FixtureOdds | n
 
   try {
     const url = `${FOOTBALL_BASE}/odds?fixture=${fixtureId}&bookmaker=8`;
-    const res = await fetch(url, {
-      headers: { "x-apisports-key": key },
-    });
+    const ctrl1 = new AbortController();
+    const t1 = setTimeout(() => ctrl1.abort(), 8000);
+    const res = await fetch(url, { headers: { "x-apisports-key": key }, signal: ctrl1.signal });
+    clearTimeout(t1);
     if (!res.ok) return null;
 
     const json = await res.json();
@@ -99,9 +100,10 @@ export async function getLeagueOdds(leagueId: number, season: number): Promise<L
 
     while (page <= totalPages && page <= 5) {
       const url = `${FOOTBALL_BASE}/odds?league=${leagueId}&season=${season}&bookmaker=8&page=${page}`;
-      const res = await fetch(url, {
-        headers: { "x-apisports-key": key },
-      });
+      const ctrlL = new AbortController();
+      const tL = setTimeout(() => ctrlL.abort(), 8000);
+      const res = await fetch(url, { headers: { "x-apisports-key": key }, signal: ctrlL.signal });
+      clearTimeout(tL);
       if (!res.ok) break;
 
       const json = await res.json();
@@ -144,9 +146,10 @@ export async function getNBAOdds(): Promise<NBAOddsMap> {
     while (page <= totalPages && page <= 5) {
       // Prefer Bet365 (id=4), fall back to any bookmaker
       const url = `${BASKETBALL_BASE}/odds?league=${NBA_LEAGUE}&season=${NBA_SEASON}&bookmaker=4&page=${page}`;
-      const res = await fetch(url, {
-        headers: { "x-apisports-key": key },
-      });
+      const ctrlN = new AbortController();
+      const tN = setTimeout(() => ctrlN.abort(), 8000);
+      const res = await fetch(url, { headers: { "x-apisports-key": key }, signal: ctrlN.signal });
+      clearTimeout(tN);
       if (!res.ok) break;
 
       const json = await res.json();
@@ -160,9 +163,10 @@ export async function getNBAOdds(): Promise<NBAOddsMap> {
     // If Bet365 returned nothing, try without bookmaker filter
     if (Object.keys(allOdds).length === 0) {
       const url = `${BASKETBALL_BASE}/odds?league=${NBA_LEAGUE}&season=${NBA_SEASON}`;
-      const res = await fetch(url, {
-        headers: { "x-apisports-key": key },
-      });
+      const ctrlFb = new AbortController();
+      const tFb = setTimeout(() => ctrlFb.abort(), 8000);
+      const res = await fetch(url, { headers: { "x-apisports-key": key }, signal: ctrlFb.signal });
+      clearTimeout(tFb);
       if (res.ok) {
         const json = await res.json();
         allOdds = parseBasketballOddsResponse(json);

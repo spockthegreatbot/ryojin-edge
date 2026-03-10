@@ -54,8 +54,8 @@ export async function initSchema() {
 
 /**
  * Feature 5: Update closing odds + CLV for a pick.
- * CLV = (closing_odds / pick.odds) - 1
- * Positive CLV = closing line moved up from our pick odds = real edge.
+ * CLV = ((closing_odds / opening_odds) - 1) * 100  (percentage)
+ * Positive CLV = closing line moved up from our pick odds = we had value.
  */
 export async function updateClosingOdds(
   matchId: string,
@@ -77,9 +77,9 @@ export async function updateClosingOdds(
 
   const row = rows[0] as { id: number; odds: number | null; opening_odds: number | null };
   const pickOdds = row.opening_odds ?? row.odds; // fall back to recorded odds
-  // CLV = (closing_odds / pick.odds) - 1
+  // CLV = ((closing_odds / opening_odds) - 1) * 100
   const clv = pickOdds && pickOdds > 1 && closingOdds > 1
-    ? parseFloat(((closingOdds / pickOdds) - 1).toFixed(4))
+    ? parseFloat((((closingOdds / pickOdds) - 1) * 100).toFixed(4))
     : null;
 
   await sql`

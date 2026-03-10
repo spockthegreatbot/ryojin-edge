@@ -100,6 +100,7 @@ const CLUBELO_SLUGS: Record<string, string> = {
   "monaco": "Monaco",
   "psv": "PSV",
   "feyenoord": "Feyenoord",
+  "galatasaray": "Galatasaray",
 };
 
 function toClubEloSlug(teamName: string): string | null {
@@ -123,7 +124,10 @@ export async function getClubElo(teamName: string): Promise<number | null> {
 
   try {
     const url = `http://api.clubelo.com/${slug}`;
-    const res = await fetch(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
     if (!res.ok) return null;
 
     const text = await res.text();

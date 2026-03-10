@@ -31,6 +31,26 @@ const slugMap: Record<string, string> = {
   "Nottingham Forest": "Nottingham_Forest",
   "Forest": "Nottingham_Forest",
   "Bournemouth": "Bournemouth",
+  // La Liga
+  "Barcelona": "Barcelona",
+  "FC Barcelona": "Barcelona",
+  "Real Madrid": "Real_Madrid",
+  "Atletico Madrid": "Atletico_Madrid",
+  "Atletico": "Atletico_Madrid",
+  // Bundesliga
+  "Bayern Munich": "Bayern_Munich",
+  "FC Bayern München": "Bayern_Munich",
+  "Bayern": "Bayern_Munich",
+  "Borussia Dortmund": "Borussia_Dortmund",
+  "Dortmund": "Borussia_Dortmund",
+  // Serie A
+  "Inter Milan": "Internazionale",
+  "Inter": "Internazionale",
+  "Juventus": "Juventus",
+  // Ligue 1
+  "Paris Saint-Germain": "Paris_Saint_Germain",
+  "Paris Saint Germain": "Paris_Saint_Germain",
+  "PSG": "Paris_Saint_Germain",
 };
 
 export async function getTeamXG(teamName: string): Promise<TeamXG | null> {
@@ -42,10 +62,14 @@ export async function getTeamXG(teamName: string): Promise<TeamXG | null> {
 
   try {
     const url = `https://understat.com/team/${slug}/2025`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
       next: { revalidate: 21600 }, // 6h cache
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!res.ok) return null;
 
     const html = await res.text();
