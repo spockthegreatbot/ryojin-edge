@@ -84,7 +84,7 @@ function ConfBar({ pct }: { pct: number }) {
   return (
     <div style={{ background: "#1a1a26", borderRadius: 3, height: 3, width: "100%", overflow: "hidden" }}>
       <div style={{
-        background: pct > 70 ? "#22c55e" : pct > 55 ? "#7c3aed" : "#eab308",
+        background: pct > 70 ? "#22c55e" : pct > 55 ? "#e8e0d0" : "#f59e0b",
         width: `${pct}%`, height: "100%", transition: "width 0.3s",
       }} />
     </div>
@@ -165,8 +165,8 @@ function MatchCard({ m }: { m: Match }) {
           onClick={e => e.stopPropagation()}
           style={{
             position: "absolute", top: 0, left: 0, right: 0, zIndex: 10,
-            background: "#16161f", borderRadius: 14,
-            border: "1px solid rgba(124,58,237,0.3)",
+            background: "#141419", borderRadius: 2,
+            border: "1px solid rgba(255,255,255,0.06)",
             padding: "14px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
           }}
         >
@@ -219,8 +219,8 @@ function MatchCard({ m }: { m: Match }) {
       <div
         className="match-card"
         style={{
-          background: "#111118",
-          borderRadius: 12,
+          background: "#141419",
+          borderRadius: 2,
           border: "1px solid rgba(255,255,255,0.06)",
           padding: "14px 14px",
           cursor: "pointer",
@@ -232,7 +232,7 @@ function MatchCard({ m }: { m: Match }) {
         }}
         onMouseEnter={(e) => {
           const el = e.currentTarget as HTMLDivElement;
-          el.style.borderColor = "rgba(124,58,237,0.3)";
+          el.style.borderColor = "rgba(255,255,255,0.12)";
         }}
         onMouseLeave={(e) => {
           const el = e.currentTarget as HTMLDivElement;
@@ -243,9 +243,8 @@ function MatchCard({ m }: { m: Match }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
             <span style={{
-              fontSize: 10, color: "#a78bfa", fontWeight: 600,
-              textTransform: "uppercase", letterSpacing: 1,
-              background: "#1e1a2e", padding: "2px 7px", borderRadius: 4,
+              fontSize: 10, color: "#44444f", fontWeight: 500,
+              textTransform: "uppercase", letterSpacing: "0.1em",
             }}>
               {sportLabel(m)}
             </span>
@@ -279,13 +278,13 @@ function MatchCard({ m }: { m: Match }) {
             { l: "A", v: m.awayOdds, delta: movement?.awayDelta },
           ].map(({ l, v, delta }) => (
             <div key={l} style={{
-              flex: 1, background: "#0d0d14", borderRadius: 6,
+              flex: 1, background: "#0f0f14", borderRadius: 2,
               padding: "5px 4px", textAlign: "center",
               border: `1px solid ${delta && delta < -0.02 ? "#1a3a2a" : delta && delta > 0.02 ? "#3a1a1a" : "rgba(255,255,255,0.04)"}`,
               position: "relative",
             }}>
               <div style={{ fontSize: 9, color: "#4b5563", marginBottom: 1 }}>{l}</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{v || "—"}</div>
+              <div style={{ fontSize: 13, fontWeight: 400, color: "#f0f0f0", fontFamily: "var(--font-dm-mono), monospace" }}>{v || "—"}</div>
               {delta && Math.abs(delta) > 0.02 && (
                 <div style={{
                   fontSize: 8, fontWeight: 700, marginTop: 1,
@@ -320,17 +319,17 @@ function MatchCard({ m }: { m: Match }) {
         {/* Top value pick inline (if any) */}
         {topPick && (
           <div style={{
-            background: topPick.value ? "#0f1a14" : "#13121e",
-            borderRadius: 8,
-            border: `1px solid ${topPick.value ? "#1a3a2a" : "#1e1a2e"}`,
+            background: "#141419",
+            borderRadius: 2,
+            border: "1px solid rgba(255,255,255,0.06)",
             padding: "7px 10px",
             marginBottom: 8,
           }}>
             <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>{topPick.market}</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: topPick.value ? "#22c55e" : "#c4b5fd" }}>{topPick.pick}</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: topPick.value ? "#22c55e" : "#e8e0d0", fontFamily: "var(--font-dm-mono), monospace" }}>{topPick.pick}</div>
               <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                {topPick.odds && <span style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700 }}>{topPick.odds.toFixed(2)}</span>}
+                {topPick.odds && <span style={{ fontSize: 11, color: "#888899", fontWeight: 400, fontFamily: "var(--font-dm-mono), monospace" }}>{topPick.odds.toFixed(2)}</span>}
                 <span style={{ fontSize: 11, fontWeight: 700, color: topPick.value ? "#22c55e" : "#6b7280" }}>{topPick.confidence}%</span>
                 <span style={{ fontSize: 10 }}>{topPick.tier.split(" ")[0]}</span>
               </div>
@@ -349,7 +348,7 @@ function MatchCard({ m }: { m: Match }) {
                     {b.pick}
                   </div>
                 </div>
-                <span style={{ fontSize: 11, fontWeight: 600, color: b.value ? "#22c55e" : "#6b7280", background: b.value ? "#0f1a14" : "#15151e", padding: "2px 6px", borderRadius: 4, marginLeft: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 400, color: b.value ? "#22c55e" : "#44444f", fontFamily: "var(--font-dm-mono), monospace", marginLeft: 6 }}>
                   {b.confidence}%
                 </span>
               </div>
@@ -359,8 +358,8 @@ function MatchCard({ m }: { m: Match }) {
           <div key={p.label} style={{ marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
               <span style={{ fontSize: 11, color: "#6b7280" }}>{p.label}</span>
-              <span style={{ fontSize: 11, color: "white", fontWeight: 600 }}>
-                {p.value} <span style={{ color: "#7c3aed" }}>{p.confidence}%</span>
+              <span style={{ fontSize: 11, color: "#f0f0f0", fontWeight: 400, fontFamily: "var(--font-dm-mono), monospace" }}>
+                {p.value} <span style={{ color: "#e8e0d0" }}>{p.confidence}%</span>
               </span>
             </div>
             <ConfBar pct={p.confidence} />
@@ -373,8 +372,8 @@ function MatchCard({ m }: { m: Match }) {
           {m.sport === "soccer" && m.dataSource === "xG" && m.xgHome > 0 && m.xgAway > 0 && (
             <span style={{
               fontSize: 9, fontWeight: 600,
-              color: "#a78bfa", background: "#1a182a",
-              padding: "1px 6px", borderRadius: 3,
+              color: "#44444f", background: "#141419",
+              padding: "1px 6px", borderRadius: 2,
             }}>
               📊 xG: {m.xgHome} | {m.xgAway}
             </span>
@@ -412,7 +411,7 @@ function MatchCard({ m }: { m: Match }) {
 
         {/* AI headline */}
         {m.aiHeadline && (
-          <div style={{ marginTop: 8, fontSize: 11, color: "#a78bfa", fontStyle: "italic", lineHeight: 1.4, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+          <div style={{ marginTop: 8, fontSize: 11, color: "#888899", fontStyle: "italic", lineHeight: 1.4, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
             {m.aiHeadline}
           </div>
         )}
@@ -444,8 +443,8 @@ function MatchCard({ m }: { m: Match }) {
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEvOpen(o => !o); }}
             style={{
               marginTop: 8, width: "100%", padding: "6px 0",
-              background: "#1a182a", border: "1px solid #252240",
-              borderRadius: 6, color: "#a78bfa", fontSize: 11, fontWeight: 600,
+              background: "#141419", border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 2, color: "#888899", fontSize: 11, fontWeight: 400,
               cursor: "pointer", letterSpacing: 0.3,
             }}
           >
@@ -460,10 +459,10 @@ function MatchCard({ m }: { m: Match }) {
 
 function SkeletonCard() {
   return (
-    <div style={{ background: "#111118", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)", padding: 16 }}>
+    <div style={{ background: "#141419", borderRadius: 2, border: "1px solid rgba(255,255,255,0.06)", padding: 16 }}>
       {[80, 120, 60, 40, 40, 40].map((w, i) => (
         <div key={i} style={{
-          background: "#1a1a24", borderRadius: 4,
+          background: "#141419", borderRadius: 2,
           height: i < 2 ? 16 : 10, width: `${w}%`,
           marginBottom: 10, animation: "pulse 1.5s infinite",
         }} />
@@ -541,7 +540,7 @@ export default function Home() {
     .sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime());
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0d0d14", padding: "0 0 40px" }}>
+    <main style={{ minHeight: "100vh", background: "#080808", padding: "0 0 40px" }}>
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes livePulse { 0%,100%{opacity:1; transform:scale(1)} 50%{opacity:0.6; transform:scale(1.25)} }
@@ -553,16 +552,16 @@ export default function Home() {
 
       {/* Hero header */}
       <div style={{
-        background: "#0d0d14",
-        borderBottom: "1px solid rgba(255,255,255,0.04)",
+        background: "#080808",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
         padding: "20px 16px 0",
         marginBottom: 0,
       }}>
         <div style={{ maxWidth: 1400, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
             <div>
-              <h1 style={{ fontSize: 22, fontWeight: 700, color: "white", margin: "0 0 3px", letterSpacing: -0.3 }}>
-                🏆 TopBet Dashboard
+              <h1 style={{ fontSize: 22, fontWeight: 400, color: "#f0f0f0", margin: "0 0 3px", letterSpacing: -0.3 }}>
+                TopBet Dashboard
               </h1>
               <p style={{ color: "#4b5563", margin: 0, fontSize: 12 }}>
                 Upcoming matches · Next 7 days · Live market analysis
@@ -577,9 +576,9 @@ export default function Home() {
           {!loading && (
             <div style={{
               display: "flex", gap: 0, flexWrap: "wrap",
-              background: "#111118",
-              borderRadius: 10,
-              border: "1px solid rgba(255,255,255,0.05)",
+              background: "#141419",
+              borderRadius: 2,
+              border: "1px solid rgba(255,255,255,0.06)",
               overflow: "hidden",
               marginBottom: 16,
             }}>
@@ -644,19 +643,16 @@ export default function Home() {
                 onClick={() => setTab(key)}
                 style={{
                   padding: "7px 14px",
-                  borderRadius: "8px 8px 0 0",
                   border: "none",
                   cursor: "pointer",
-                  fontWeight: tab === key ? 600 : 400,
+                  fontWeight: tab === key ? 500 : 400,
                   fontSize: 12,
-                  background: tab === key ? "#7c3aed" : "transparent",
-                  color: tab === key ? "white" : "#6b7280",
-                  transition: "all 0.15s",
+                  background: "transparent",
+                  color: tab === key ? "#e8e0d0" : "#44444f",
+                  transition: "color 0.15s",
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
-                  position: "relative",
-                  bottom: -1,
                 }}
               >
                 {label}
@@ -664,8 +660,9 @@ export default function Home() {
                   <span style={{
                     fontSize: 10,
                     fontWeight: 600,
-                    background: tab === key ? "rgba(255,255,255,0.2)" : "#1a1a24",
-                    color: tab === key ? "white" : "#4b5563",
+                    background: "transparent",
+                    color: tab === key ? "#888899" : "#44444f",
+                    fontFamily: "var(--font-dm-mono), monospace",
                     padding: "1px 6px",
                     borderRadius: 20,
                     minWidth: 18,
@@ -692,9 +689,9 @@ export default function Home() {
           <div style={{
             textAlign: "center",
             padding: "60px 20px",
-            background: "#111118",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.05)",
+            background: "#141419",
+            borderRadius: 2,
+            border: "1px solid rgba(255,255,255,0.06)",
           }}>
             <div style={{
               fontSize: 40, marginBottom: 16,

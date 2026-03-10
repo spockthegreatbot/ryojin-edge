@@ -51,8 +51,8 @@ function LegRow({ leg, index }: { leg: ParlayLeg; index: number }) {
         style={{
           fontSize: 11,
           fontWeight: 700,
-          color: "#7c3aed",
-          background: "rgba(124,58,237,0.15)",
+          color: "#e8e0d0",
+          background: "rgba(232,224,208,0.08)",
           width: 20,
           height: 20,
           borderRadius: "50%",
@@ -92,13 +92,13 @@ function ParlayCard({ parlay }: { parlay: Parlay }) {
     : isStrong
     ? "rgba(34,197,94,0.3)"
     : "rgba(96,165,250,0.2)";
-  const leftBorder = isPower ? "#7c3aed" : isStrong ? "#22c55e" : "#60a5fa";
+  const leftBorder = isPower ? "#e8e0d0" : isStrong ? "#22c55e" : "#60a5fa";
 
   return (
     <div
       style={{
-        background: "#12121a",
-        borderRadius: 14,
+        background: "#141419",
+        borderRadius: 2,
         border: `1px solid ${borderColor}`,
         borderLeft: `4px solid ${leftBorder}`,
         padding: "16px 18px",
@@ -148,7 +148,7 @@ function ParlayCard({ parlay }: { parlay: Parlay }) {
           <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 2 }}>
             Combined Odds
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "white" }}>
+          <div style={{ fontSize: 28, fontWeight: 300, color: "#f0f0f0", fontFamily: "var(--font-dm-mono), monospace" }}>
             @ {parlay.combinedOdds.toFixed(2)}
           </div>
         </div>
@@ -156,7 +156,7 @@ function ParlayCard({ parlay }: { parlay: Parlay }) {
           <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 2 }}>
             Combined Edge
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#22c55e" }}>
+          <div style={{ fontSize: 22, fontWeight: 300, color: "#22c55e", fontFamily: "var(--font-dm-mono), monospace" }}>
             {parlay.combinedEdgePct}
           </div>
         </div>
@@ -164,7 +164,7 @@ function ParlayCard({ parlay }: { parlay: Parlay }) {
           <div style={{ fontSize: 11, color: "#4b5563", marginBottom: 2 }}>
             Model Prob
           </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#7c3aed" }}>
+          <div style={{ fontSize: 18, fontWeight: 300, color: "#e8e0d0", fontFamily: "var(--font-dm-mono), monospace" }}>
             {parlay.combinedProb}%
           </div>
         </div>
@@ -223,7 +223,7 @@ export default function ParlaysPage() {
   const threeLeg = data?.threeLeg ?? [];
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0d0d14" }}>
+    <main style={{ minHeight: "100vh", background: "#080808" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px" }}>
         {/* Header */}
         <div style={{ marginBottom: 28 }}>
@@ -263,9 +263,9 @@ export default function ParlaysPage() {
             <button
               onClick={fetchParlays}
               style={{
-                background: "rgba(124,58,237,0.15)",
-                border: "1px solid rgba(124,58,237,0.3)",
-                color: "#7c3aed",
+                background: "rgba(232,224,208,0.08)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                color: "#888899",
                 borderRadius: 6,
                 padding: "3px 10px",
                 fontSize: 12,
@@ -308,9 +308,9 @@ export default function ParlaysPage() {
               <div
                 key={label}
                 style={{
-                  background: "#12121a",
+                  background: "#141419",
                   border: "1px solid rgba(255,255,255,0.07)",
-                  borderRadius: 8,
+                  borderRadius: 2,
                   padding: "6px 14px",
                   fontSize: 12,
                   fontWeight: 600,
@@ -329,8 +329,8 @@ export default function ParlaysPage() {
               <div
                 key={i}
                 style={{
-                  background: "#12121a",
-                  borderRadius: 14,
+                  background: "#141419",
+                  borderRadius: 2,
                   border: "1px solid rgba(255,255,255,0.07)",
                   height: 180,
                   animation: "pulse 1.5s infinite",
@@ -341,8 +341,8 @@ export default function ParlaysPage() {
         ) : (data?.parlays?.length ?? 0) === 0 ? (
           <div
             style={{
-              background: "#12121a",
-              borderRadius: 16,
+              background: "#141419",
+              borderRadius: 2,
               border: "1px solid rgba(255,255,255,0.07)",
               padding: "60px 24px",
               textAlign: "center",
@@ -459,8 +459,8 @@ export default function ParlaysPage() {
             {/* Info footer */}
             <div
               style={{
-                background: "#12121a",
-                borderRadius: 12,
+                background: "#141419",
+                borderRadius: 2,
                 border: "1px solid rgba(255,255,255,0.05)",
                 padding: "12px 16px",
                 fontSize: 12,

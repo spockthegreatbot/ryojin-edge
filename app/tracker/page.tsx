@@ -174,8 +174,8 @@ export default function Tracker() {
   }
 
   const inputStyle: React.CSSProperties = {
-    width: "100%", background: "#0d0d14", border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: 8, padding: "8px 12px", color: "white", fontSize: 13, outline: "none",
+    width: "100%", background: "#080808", border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 2, padding: "8px 12px", color: "white", fontSize: 13, outline: "none",
     boxSizing: "border-box",
   };
 
@@ -183,7 +183,7 @@ export default function Tracker() {
   const wrColor = winRate >= 50 ? "#22c55e" : "#eab308";
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0d0d14", padding: "0 0 60px" }}>
+    <main style={{ minHeight: "100vh", background: "#080808", padding: "0 0 60px" }}>
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
         input[type=number]::-webkit-outer-spin-button,
@@ -199,7 +199,7 @@ export default function Tracker() {
         <div style={{ maxWidth: 960, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <Link href="/" style={{ color: "#7c3aed", textDecoration: "none", fontSize: 12 }}>← Back</Link>
+              <Link href="/" style={{ color: "#44444f", textDecoration: "none", fontSize: 12 }}>← Back</Link>
               <h1 style={{ color: "white", fontSize: 22, fontWeight: 800, marginTop: 4, marginBottom: 0 }}>
                 💰 Bet Tracker
               </h1>
@@ -207,8 +207,8 @@ export default function Tracker() {
             <button
               onClick={() => { setShowForm(!showForm); setEditId(null); }}
               style={{
-                background: "#7c3aed", border: "none", borderRadius: 10,
-                color: "white", fontSize: 13, fontWeight: 700,
+                background: "rgba(232,224,208,0.08)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 2,
+                color: "#e8e0d0", fontSize: 12, fontWeight: 400,
                 padding: "10px 20px", cursor: "pointer",
               }}
             >
@@ -222,15 +222,15 @@ export default function Tracker() {
 
         {/* ── P&L Summary ── */}
         <div style={{
-          background: "#12121a", border: "1px solid rgba(255,255,255,0.07)",
-          borderRadius: 16, padding: "20px 24px", marginBottom: 20,
+          background: "#141419", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 2, padding: "20px 24px", marginBottom: 20,
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
             <div>
               <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase", letterSpacing: 1 }}>
                 Net P&L
               </div>
-              <div style={{ fontSize: 36, fontWeight: 800, color: pnlColor, marginTop: 4 }}>
+              <div style={{ fontSize: 36, fontWeight: 300, color: pnlColor, marginTop: 4, fontFamily: "var(--font-dm-mono), monospace" }}>
                 {fmtCurrency(pnl, true)}
               </div>
               <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
@@ -240,14 +240,14 @@ export default function Tracker() {
             </div>
             <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: wrColor }}>{winRate}%</div>
+                <div style={{ fontSize: 24, fontWeight: 300, color: wrColor, fontFamily: "var(--font-dm-mono), monospace" }}>{winRate}%</div>
                 <div style={{ fontSize: 10, color: "#6b7280" }}>Win Rate</div>
                 <div style={{ fontSize: 10, color: "#4b5563" }}>
                   {nonVoidSettled.filter(b => b.result === "win").length}W / {nonVoidSettled.filter(b => b.result === "loss").length}L
                 </div>
               </div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: "#eab308" }}>{pending.length}</div>
+                <div style={{ fontSize: 24, fontWeight: 300, color: "#f59e0b", fontFamily: "var(--font-dm-mono), monospace" }}>{pending.length}</div>
                 <div style={{ fontSize: 10, color: "#6b7280" }}>Pending</div>
                 <div style={{ fontSize: 10, color: "#4b5563" }}>{fmtCurrency(pendingExposure)} exposure</div>
               </div>
@@ -262,8 +262,8 @@ export default function Tracker() {
         {/* ── Add / Edit Form ── */}
         {showForm && (
           <div style={{
-            background: "#12121a", border: "1px solid rgba(124,58,237,0.3)",
-            borderRadius: 16, padding: 20, marginBottom: 20,
+            background: "#141419", border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: 2, padding: 20, marginBottom: 20,
           }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "white", marginBottom: 16 }}>
               {editId ? "✏️ Edit Bet" : "➕ Log New Bet"}
@@ -309,7 +309,7 @@ export default function Tracker() {
               </div>
             </div>
             {form.odds && form.stake && parseFloat(form.odds) > 1 && parseFloat(form.stake) > 0 && (
-              <div style={{ marginTop: 12, fontSize: 12, color: "#7c3aed", background: "rgba(124,58,237,0.08)", padding: "8px 12px", borderRadius: 8 }}>
+              <div style={{ marginTop: 12, fontSize: 12, color: "#888899", background: "rgba(255,255,255,0.04)", padding: "8px 12px", borderRadius: 2 }}>
                 💡 To win: <strong>{fmtCurrency(parseFloat(form.stake) * (parseFloat(form.odds) - 1))}</strong> · Total return: <strong>{fmtCurrency(parseFloat(form.stake) * parseFloat(form.odds))}</strong>
               </div>
             )}
@@ -318,8 +318,8 @@ export default function Tracker() {
               disabled={saving}
               style={{
                 marginTop: 14, width: "100%", padding: "10px 0",
-                background: saving ? "#4b5563" : "#7c3aed",
-                border: "none", borderRadius: 10, color: "white",
+                background: saving ? "rgba(255,255,255,0.04)" : "rgba(232,224,208,0.08)",
+                border: "1px solid rgba(255,255,255,0.06)", borderRadius: 2, color: saving ? "#44444f" : "#e8e0d0",
                 fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer",
               }}
             >
@@ -333,9 +333,9 @@ export default function Tracker() {
           {/* Status */}
           {([["all", "All"], ["pending", "⏳ Pending"], ["settled", "✅ Settled"]] as [StatusFilter, string][]).map(([k, l]) => (
             <button key={k} onClick={() => setStatusFilter(k)} style={{
-              padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
-              background: statusFilter === k ? "#7c3aed" : "rgba(255,255,255,0.05)",
-              color: statusFilter === k ? "white" : "#6b7280",
+              padding: "6px 14px", borderRadius: 2, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer",
+              background: "transparent",
+              color: statusFilter === k ? "#e8e0d0" : "#44444f",
             }}>{l}</button>
           ))}
 
@@ -344,9 +344,9 @@ export default function Tracker() {
           {/* Sport */}
           {SPORTS.map(s => (
             <button key={s} onClick={() => setSportFilter(s)} style={{
-              padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
-              background: sportFilter === s ? "#1e1b4b" : "rgba(255,255,255,0.03)",
-              color: sportFilter === s ? "#a78bfa" : "#4b5563",
+              padding: "6px 10px", borderRadius: 2, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
+              background: "transparent",
+              color: sportFilter === s ? "#e8e0d0" : "#44444f",
             }}>
               {s === "all" ? "All Sports" : `${SPORT_EMOJIS[s] ?? "🎲"} ${s.toUpperCase()}`}
             </button>
@@ -357,9 +357,9 @@ export default function Tracker() {
           {/* Date range */}
           {([["all", "All Time"], ["week", "This Week"], ["month", "This Month"]] as [DateFilter, string][]).map(([k, l]) => (
             <button key={k} onClick={() => setDateFilter(k)} style={{
-              padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
-              background: dateFilter === k ? "#1a1a2e" : "rgba(255,255,255,0.03)",
-              color: dateFilter === k ? "#9ca3af" : "#4b5563",
+              padding: "6px 12px", borderRadius: 2, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
+              background: "transparent",
+              color: dateFilter === k ? "#e8e0d0" : "#44444f",
             }}>{l}</button>
           ))}
         </div>
@@ -369,7 +369,7 @@ export default function Tracker() {
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {Array(4).fill(null).map((_, i) => (
               <div key={i} style={{
-                height: 80, background: "#12121a", borderRadius: 12,
+                height: 80, background: "#141419", borderRadius: 2,
                 border: "1px solid rgba(255,255,255,0.05)",
                 animation: "pulse 1.5s infinite",
               }} />
@@ -377,7 +377,7 @@ export default function Tracker() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={{
-            background: "#12121a", borderRadius: 16,
+            background: "#141419", borderRadius: 2,
             border: "1px solid rgba(255,255,255,0.07)",
             padding: 60, textAlign: "center",
           }}>
@@ -397,7 +397,7 @@ export default function Tracker() {
                 : b.result === "void" ? 0 : null;
               return (
                 <div key={b.id} style={{
-                  background: "#12121a", borderRadius: 12,
+                  background: "#141419", borderRadius: 2,
                   border: `1px solid ${b.result === "win" ? "rgba(34,197,94,0.25)" : b.result === "loss" ? "rgba(239,68,68,0.2)" : b.result === "void" ? "rgba(107,114,128,0.2)" : "rgba(255,255,255,0.07)"}`,
                   padding: "14px 16px",
                 }}>
@@ -417,7 +417,7 @@ export default function Tracker() {
                       <div style={{ fontSize: 14, fontWeight: 700, color: "white", marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {b.match}
                       </div>
-                      <div style={{ fontSize: 12, color: "#a78bfa" }}>
+                      <div style={{ fontSize: 12, color: "#888899" }}>
                         {b.market}: <strong>{b.pick}</strong> @ {b.odds.toFixed(2)}
                       </div>
                       {b.notes && <div style={{ fontSize: 11, color: "#4b5563", marginTop: 3, fontStyle: "italic" }}>{b.notes}</div>}
@@ -446,7 +446,7 @@ export default function Tracker() {
                         <button onClick={() => settle(b.id, "void")} style={{ flex: 1, padding: "6px 0", background: "rgba(107,114,128,0.08)", border: "1px solid rgba(107,114,128,0.2)", borderRadius: 7, color: "#6b7280", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>↩️ Void</button>
                       </>
                     )}
-                    <button onClick={() => startEdit(b)} style={{ padding: "6px 12px", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: 7, color: "#7c3aed", fontSize: 11, cursor: "pointer" }}>✏️</button>
+                    <button onClick={() => startEdit(b)} style={{ padding: "6px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 2, color: "#888899", fontSize: 11, cursor: "pointer" }}>✏️</button>
                     <button onClick={() => deleteBet(b.id)} style={{ padding: "6px 12px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 7, color: "#ef4444", fontSize: 11, cursor: "pointer" }}>🗑️</button>
                   </div>
                 </div>

@@ -35,7 +35,7 @@ interface StatsData {
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 function ChartSkeleton({ h }: { h: number }) {
   return (
-    <div style={{ height: h, background: "rgba(255,255,255,0.03)", borderRadius: 10, animation: "pulse 1.5s infinite" }} />
+    <div style={{ height: h, background: "rgba(255,255,255,0.03)", borderRadius: 2, animation: "pulse 1.5s infinite" }} />
   );
 }
 
@@ -51,8 +51,9 @@ function WinRateBadge({ rate }: { rate: number | null }) {
   const col = rate >= 55 ? "#22c55e" : rate >= 45 ? "#f59e0b" : "#ef4444";
   return (
     <span style={{
-      fontWeight: 700, fontSize: 13, color: col,
-      background: col + "18", padding: "2px 8px", borderRadius: 6,
+      fontFamily: "var(--font-dm-mono), monospace",
+      fontWeight: 500, fontSize: 13, color: col,
+      padding: "2px 8px",
     }}>
       {rate}%
     </span>
@@ -69,7 +70,7 @@ function OutcomePill({ outcome }: { outcome: string | null }) {
   };
   const s = map[outcome] ?? { label: outcome, color: "#9ca3af", bg: "rgba(156,163,175,0.1)" };
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, color: s.color, background: s.bg, padding: "2px 8px", borderRadius: 6 }}>
+    <span style={{ fontSize: 11, fontWeight: 600, color: s.color, padding: "2px 8px" }}>
       {s.label}
     </span>
   );
@@ -79,9 +80,9 @@ function OutcomePill({ outcome }: { outcome: string | null }) {
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
-      background: "#12121a",
-      border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: 16,
+      background: "#141419",
+      border: "1px solid rgba(255,255,255,0.06)",
+      borderRadius: 2,
       padding: "22px 24px",
       ...style,
     }}>
@@ -92,7 +93,7 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
 
 function CardTitle({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ fontSize: 13, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 18, ...style }}>
+    <div style={{ fontSize: 11, fontWeight: 400, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 18, ...style }}>
       {children}
     </div>
   );
@@ -175,7 +176,7 @@ export default function StatsPage() {
   const profitColor = (data?.totalProfit ?? 0) >= 0 ? "#22c55e" : "#ef4444";
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0d0d14", padding: "0 0 60px" }}>
+    <main style={{ minHeight: "100vh", background: "#080808", padding: "0 0 60px" }}>
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
         @keyframes spin { to{transform:rotate(360deg)} }
@@ -212,8 +213,8 @@ export default function StatsPage() {
               onClick={() => load(true)}
               disabled={refreshing}
               style={{
-                background: "#1a1a2e", border: "1px solid rgba(255,255,255,0.1)",
-                color: "#9ca3af", borderRadius: 10, padding: "8px 16px",
+                background: "#141419", border: "1px solid rgba(255,255,255,0.06)",
+                color: "#888899", borderRadius: 2, padding: "8px 16px",
                 fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
               }}
             >
@@ -230,12 +231,12 @@ export default function StatsPage() {
         <div className="stats-grid-top" style={{ marginBottom: 20 }}>
           {/* Total Bets */}
           <Card>
-            <div style={{ fontSize: 11, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-              📋 Total Bets
+            <div style={{ fontSize: 11, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 8 }}>
+              Total Bets
             </div>
             {loading
-              ? <div style={{ height: 36, background: "rgba(255,255,255,0.05)", borderRadius: 6, animation: "pulse 1.5s infinite" }} />
-              : <div style={{ fontSize: 36, fontWeight: 800, color: "white" }}>{ov?.total ?? 0}</div>
+              ? <div style={{ height: 36, background: "rgba(255,255,255,0.05)", borderRadius: 2, animation: "pulse 1.5s infinite" }} />
+              : <div style={{ fontSize: 36, fontWeight: 300, color: "#f0f0f0", fontFamily: "var(--font-dm-mono), monospace" }}>{ov?.total ?? 0}</div>
             }
             {!loading && hasData && (
               <div style={{ marginTop: 8, display: "flex", gap: 12, fontSize: 12, color: "#6b7280" }}>
@@ -248,19 +249,19 @@ export default function StatsPage() {
 
           {/* ROI */}
           <Card>
-            <div style={{ fontSize: 11, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-              % Total ROI
+            <div style={{ fontSize: 11, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 8 }}>
+              Total ROI
             </div>
             {loading
-              ? <div style={{ height: 36, background: "rgba(255,255,255,0.05)", borderRadius: 6, animation: "pulse 1.5s infinite" }} />
-              : <div style={{ fontSize: 36, fontWeight: 800, color: hasResolved ? roiColor : "#4b5563" }}>
+              ? <div style={{ height: 36, background: "rgba(255,255,255,0.05)", borderRadius: 2, animation: "pulse 1.5s infinite" }} />
+              : <div style={{ fontSize: 36, fontWeight: 300, color: hasResolved ? roiColor : "#44444f", fontFamily: "var(--font-dm-mono), monospace" }}>
                   {hasResolved ? `${(data?.roi ?? 0) >= 0 ? "+" : ""}${data?.roi ?? 0}%` : "—"}
                 </div>
             }
             {!loading && hasResolved && (
               <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280" }}>
                 Win rate: <span style={{ color: "white", fontWeight: 700 }}>{ov?.win_rate ?? "—"}%</span>
-                {" · "}Avg edge: <span style={{ color: "#7c3aed", fontWeight: 700 }}>{ov?.avg_edge_all ?? "—"}%</span>
+                {" · "}Avg edge: <span style={{ color: "#e8e0d0", fontWeight: 500, fontFamily: "var(--font-dm-mono), monospace" }}>{ov?.avg_edge_all ?? "—"}%</span>
               </div>
             )}
             {!loading && !hasResolved && (
@@ -270,12 +271,12 @@ export default function StatsPage() {
 
           {/* P&L */}
           <Card>
-            <div style={{ fontSize: 11, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-              $ Total Result
+            <div style={{ fontSize: 11, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 8 }}>
+              Total Result
             </div>
             {loading
-              ? <div style={{ height: 36, background: "rgba(255,255,255,0.05)", borderRadius: 6, animation: "pulse 1.5s infinite" }} />
-              : <div style={{ fontSize: 36, fontWeight: 800, color: hasResolved ? profitColor : "#4b5563" }}>
+              ? <div style={{ height: 36, background: "rgba(255,255,255,0.05)", borderRadius: 2, animation: "pulse 1.5s infinite" }} />
+              : <div style={{ fontSize: 36, fontWeight: 300, color: hasResolved ? profitColor : "#44444f", fontFamily: "var(--font-dm-mono), monospace" }}>
                   {hasResolved
                     ? `${(data?.totalProfit ?? 0) >= 0 ? "+" : ""}$${Math.abs(data?.totalProfit ?? 0).toFixed(2)}`
                     : "—"}
@@ -302,7 +303,7 @@ export default function StatsPage() {
                   <div style={{ fontSize: 11, color: "#4b5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
                     📈 Closing Line Value (CLV)
                   </div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: (data?.avgClv ?? 0) >= 0 ? "#22c55e" : "#ef4444" }}>
+                  <div style={{ fontSize: 28, fontWeight: 300, color: (data?.avgClv ?? 0) >= 0 ? "#22c55e" : "#ef4444", fontFamily: "var(--font-dm-mono), monospace" }}>
                     {(data?.avgClv ?? 0) >= 0 ? "+" : ""}{data?.avgClv?.toFixed(2) ?? "0.00"}%
                   </div>
                   <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>
@@ -312,7 +313,7 @@ export default function StatsPage() {
                 <div style={{
                   background: (data?.avgClv ?? 0) >= 0 ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
                   border: `1px solid ${(data?.avgClv ?? 0) >= 0 ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
-                  borderRadius: 12,
+                  borderRadius: 2,
                   padding: "12px 18px",
                   maxWidth: 360,
                   fontSize: 12,
@@ -408,12 +409,11 @@ export default function StatsPage() {
             <div style={{ display: 'flex', gap: 6 }}>
               {(['all','wins','losses','pending'] as const).map(f => {
                 const counts = { all: data?.recentPicks.length ?? 0, wins: data?.recentPicks.filter(p => p.outcome === 'win').length ?? 0, losses: data?.recentPicks.filter(p => p.outcome === 'loss').length ?? 0, pending: data?.recentPicks.filter(p => !p.outcome).length ?? 0 };
-                const colors = { all: '#6b7280', wins: '#22c55e', losses: '#ef4444', pending: '#d29922' };
                 const active = picksFilter === f;
                 return (
                   <button key={f} onClick={() => setPicksFilter(f)} style={{
-                    padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: `1px solid ${active ? colors[f] : 'rgba(255,255,255,0.08)'}`,
-                    background: active ? `${colors[f]}20` : 'transparent', color: active ? colors[f] : '#6b7280', transition: 'all 0.15s',
+                    padding: '5px 12px', fontSize: 12, fontWeight: active ? 500 : 400, cursor: 'pointer', border: 'none',
+                    background: 'transparent', color: active ? '#e8e0d0' : '#44444f', transition: 'color 0.15s',
                   }}>
                     {f.charAt(0).toUpperCase() + f.slice(1)} <span style={{ opacity: 0.7 }}>({counts[f]})</span>
                   </button>
@@ -453,7 +453,7 @@ export default function StatsPage() {
                     return true;
                   }).map((pick, i) => (
                     <tr key={i}>
-                      <td style={{ color: "#6b7280", whiteSpace: "nowrap", fontSize: 12 }}>
+                      <td style={{ color: "#888899", whiteSpace: "nowrap", fontSize: 12, fontFamily: "var(--font-dm-mono), monospace" }}>
                         {fmt(pick.date)}
                       </td>
                       <td style={{ color: "#d1d5db", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -462,11 +462,10 @@ export default function StatsPage() {
                       </td>
                       <td>
                         <span style={{
-                          fontSize: 12, fontWeight: 600,
-                          background: "rgba(124,58,237,0.15)",
-                          color: "#c4b5fd",
-                          padding: "3px 9px", borderRadius: 6,
+                          fontSize: 12, fontWeight: 500,
+                          color: "#e8e0d0",
                           whiteSpace: "nowrap",
+                          fontFamily: "var(--font-dm-mono), monospace",
                         }}>
                           {pick.pick}
                         </span>

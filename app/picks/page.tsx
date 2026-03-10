@@ -10,8 +10,8 @@ function HowScoredExplainer() {
   return (
     <div style={{
       marginBottom: 20,
-      background: "#111118",
-      borderRadius: 10,
+      background: "#141419",
+      borderRadius: 2,
       border: "1px solid rgba(255,255,255,0.06)",
       overflow: "hidden",
     }}>
@@ -23,8 +23,8 @@ function HowScoredExplainer() {
           cursor: "pointer", textAlign: "left",
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#7c3aed" }}>
-          🧠 How are these scored?
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#e8e0d0" }}>
+          How are these scored?
         </span>
         <span style={{ fontSize: 16, color: "#4b5563", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
       </button>
@@ -41,7 +41,7 @@ function HowScoredExplainer() {
             <span style={{ fontSize: 12, color: "#22c55e", background: "#0f1a14", padding: "3px 10px", borderRadius: 5, fontWeight: 600 }}>✅ Edge 5–10% = Lean</span>
             <span style={{ fontSize: 12, color: "#9ca3af" }}>Kelly Criterion sizing shown per pick.</span>
           </div>
-          <Link href="/about" style={{ fontSize: 12, color: "#7c3aed", textDecoration: "none", fontWeight: 600 }}>
+          <Link href="/about" style={{ fontSize: 12, color: "#e8e0d0", textDecoration: "none", fontWeight: 500 }}>
             Full methodology → /about
           </Link>
         </div>
@@ -126,9 +126,9 @@ function HeroPick({ bet }: { bet: ValueBet }) {
   return (
     <Link href={`/match/${bet.matchId}`} style={{ textDecoration: "none", display: "block", marginBottom: 28 }}>
       <div style={{
-        background: "#0f1a14",
-        borderRadius: 14,
-        border: "1px solid #1a3a2a",
+        background: "#141419",
+        borderRadius: 2,
+        border: "1px solid rgba(255,255,255,0.06)",
         padding: "20px 22px",
         position: "relative",
         overflow: "hidden",
@@ -136,10 +136,10 @@ function HeroPick({ bet }: { bet: ValueBet }) {
         transition: "border-color 0.2s",
       }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "#2a5a3a";
+          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.12)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "#1a3a2a";
+          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.06)";
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
@@ -162,8 +162,8 @@ function HeroPick({ bet }: { bet: ValueBet }) {
             <div style={{ fontSize: 14, color: "#9ca3af", marginBottom: 6 }}>{bet.matchName}</div>
 
             {/* Market + pick */}
-            <div style={{ fontSize: 11, color: "#7c3aed", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>{bet.market}</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "#22c55e", marginBottom: 8 }}>{bet.pick}</div>
+            <div style={{ fontSize: 11, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{bet.market}</div>
+            <div style={{ fontSize: 28, fontWeight: 300, color: "#22c55e", marginBottom: 8, fontFamily: "var(--font-dm-mono), monospace" }}>{bet.pick}</div>
 
             {/* Reasoning */}
             <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.6, marginBottom: 8 }}>{bet.reasoning}</div>
@@ -185,11 +185,11 @@ function HeroPick({ bet }: { bet: ValueBet }) {
           {/* Stats column */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-end", minWidth: 120 }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 36, fontWeight: 800, color: "#22c55e" }}>+{(bet.edge * 100).toFixed(1)}%</div>
-              <div style={{ fontSize: 10, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.8 }}>Edge</div>
+              <div style={{ fontSize: 36, fontWeight: 300, color: "#22c55e", fontFamily: "var(--font-dm-mono), monospace" }}>+{(bet.edge * 100).toFixed(1)}%</div>
+              <div style={{ fontSize: 10, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.1em" }}>Edge</div>
             </div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "#7c3aed" }}>{bet.confidence}%</div>
+              <div style={{ fontSize: 24, fontWeight: 300, color: "#e8e0d0", fontFamily: "var(--font-dm-mono), monospace" }}>{bet.confidence}%</div>
               <div style={{ fontSize: 10, color: "#6b7280" }}>Confidence</div>
             </div>
             {bet.odds && (
@@ -225,8 +225,8 @@ function ValueBetCard({ bet }: { bet: ValueBet }) {
   return (
     <Link href={`/match/${bet.matchId}`} style={{ textDecoration: "none" }}>
       <div style={{
-        background: "#111118",
-        borderRadius: 12,
+        background: "#141419",
+        borderRadius: 2,
         border: "1px solid rgba(255,255,255,0.06)",
         padding: "14px 16px",
         height: "100%",
@@ -236,7 +236,7 @@ function ValueBetCard({ bet }: { bet: ValueBet }) {
         transition: "border-color 0.2s",
       }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "#1a3a2a";
+          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.12)";
         }}
         onMouseLeave={(e) => {
           (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.06)";
@@ -256,9 +256,8 @@ function ValueBetCard({ bet }: { bet: ValueBet }) {
         {/* Market + pick */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
           <span style={{
-            fontSize: 10, color: "#a78bfa", textTransform: "uppercase",
-            letterSpacing: 0.8, background: "#1a182a",
-            padding: "2px 8px", borderRadius: 4, fontWeight: 600,
+            fontSize: 10, color: "#44444f", textTransform: "uppercase",
+            letterSpacing: "0.1em", fontWeight: 500,
           }}>
             {bet.market}
           </span>
@@ -286,12 +285,12 @@ function ValueBetCard({ bet }: { bet: ValueBet }) {
         {/* Stats row */}
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#22c55e" }}>+{(bet.edge * 100).toFixed(1)}%</div>
-            <div style={{ fontSize: 9, color: "#6b7280", textTransform: "uppercase", letterSpacing: 0.5 }}>Edge</div>
+            <div style={{ fontSize: 16, fontWeight: 400, color: "#22c55e", fontFamily: "var(--font-dm-mono), monospace" }}>+{(bet.edge * 100).toFixed(1)}%</div>
+            <div style={{ fontSize: 9, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.1em" }}>Edge</div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#7c3aed" }}>{bet.confidence}%</div>
-            <div style={{ fontSize: 9, color: "#6b7280" }}>Conf</div>
+            <div style={{ fontSize: 16, fontWeight: 400, color: "#e8e0d0", fontFamily: "var(--font-dm-mono), monospace" }}>{bet.confidence}%</div>
+            <div style={{ fontSize: 9, color: "#44444f" }}>Conf</div>
           </div>
           {bet.odds && (
             <div style={{ textAlign: "center" }}>
@@ -313,7 +312,7 @@ function ValueBetCard({ bet }: { bet: ValueBet }) {
         <div style={{ marginTop: 8 }}>
           <div style={{ background: "#0a0a0f", borderRadius: 4, height: 5, overflow: "hidden" }}>
             <div style={{
-              background: bet.confidence > 70 ? "#22c55e" : "#7c3aed",
+              background: bet.confidence > 70 ? "#22c55e" : "#e8e0d0",
               width: `${bet.confidence}%`, height: "100%",
               transition: "width 0.4s",
             }} />
@@ -386,7 +385,7 @@ export default function PicksPage() {
   const nbaBets = restPicks.filter((b) => b.sport === "nba");
 
   return (
-    <main style={{ minHeight: "100vh", background: "#0d0d14" }}>
+    <main style={{ minHeight: "100vh", background: "#080808" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px" }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
@@ -403,9 +402,9 @@ export default function PicksPage() {
             <button
               onClick={fetchPicks}
               style={{
-                background: "#1a182a", border: "1px solid #252240",
-                color: "#a78bfa", borderRadius: 5, padding: "3px 10px",
-                fontSize: 12, cursor: "pointer", fontWeight: 500,
+                background: "#141419", border: "1px solid rgba(255,255,255,0.06)",
+                color: "#888899", borderRadius: 2, padding: "3px 10px",
+                fontSize: 12, cursor: "pointer", fontWeight: 400,
               }}
             >
               ↻ Refresh
@@ -420,16 +419,16 @@ export default function PicksPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[1, 2, 3].map((i) => (
               <div key={i} style={{
-                background: "#111118", borderRadius: 12,
-                border: "1px solid rgba(255,255,255,0.05)", padding: "14px 16px",
+                background: "#141419", borderRadius: 2,
+                border: "1px solid rgba(255,255,255,0.06)", padding: "14px 16px",
                 height: 120, animation: "pulse 1.5s infinite",
               }} />
             ))}
           </div>
         ) : valueBets.length === 0 ? (
           <div style={{
-            background: "#111118", borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.05)",
+            background: "#141419", borderRadius: 2,
+            border: "1px solid rgba(255,255,255,0.06)",
             padding: "50px 24px", textAlign: "center",
           }}>
             <div style={{ fontSize: 40, marginBottom: 14, animation: "livePulse 2s ease-in-out infinite", display: "inline-block" }}>⏳</div>
@@ -450,21 +449,20 @@ export default function PicksPage() {
               <div style={{ fontSize: 13, color: "#6b7280" }}>
                 {restPicks.length} more value bet{restPicks.length !== 1 ? "s" : ""}
               </div>
-              <div style={{ display: "flex", gap: 4, background: "#111118", borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)", padding: 3 }}>
+              <div style={{ display: "flex", gap: 16 }}>
                 {(["date", "edge"] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setSortMode(mode)}
                     style={{
-                      padding: "5px 14px",
-                      borderRadius: 6,
+                      padding: "5px 0",
                       border: "none",
                       cursor: "pointer",
-                      fontWeight: 600,
+                      fontWeight: sortMode === mode ? 500 : 400,
                       fontSize: 12,
-                      background: sortMode === mode ? "#7c3aed" : "transparent",
-                      color: sortMode === mode ? "white" : "#6b7280",
-                      transition: "all 0.15s",
+                      background: "transparent",
+                      color: sortMode === mode ? "#e8e0d0" : "#44444f",
+                      transition: "color 0.15s",
                     }}
                   >
                     {mode === "date" ? "📅 By Date" : "📈 By Edge"}
@@ -482,8 +480,8 @@ export default function PicksPage() {
                   marginBottom: 14, display: "flex", alignItems: "center", gap: 8,
                 }}>
                   ⚽ Soccer
-                  <span style={{ fontSize: 11, background: "#1a1a24", padding: "2px 8px", borderRadius: 20, color: "#6b7280", fontWeight: 500 }}>
-                    {soccerBets.length} pick{soccerBets.length !== 1 ? "s" : ""}
+                  <span style={{ fontSize: 11, color: "#44444f", fontWeight: 400, fontFamily: "var(--font-dm-mono), monospace" }}>
+                    {soccerBets.length}
                   </span>
                 </h2>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14 }}>
@@ -503,8 +501,8 @@ export default function PicksPage() {
                   marginBottom: 14, display: "flex", alignItems: "center", gap: 8,
                 }}>
                   🏀 NBA
-                  <span style={{ fontSize: 11, background: "#1a1a24", padding: "2px 8px", borderRadius: 20, color: "#6b7280", fontWeight: 500 }}>
-                    {nbaBets.length} pick{nbaBets.length !== 1 ? "s" : ""}
+                  <span style={{ fontSize: 11, color: "#44444f", fontWeight: 400, fontFamily: "var(--font-dm-mono), monospace" }}>
+                    {nbaBets.length}
                   </span>
                 </h2>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14 }}>
@@ -517,8 +515,8 @@ export default function PicksPage() {
 
             {/* Summary footer */}
             <div style={{
-              background: "#111118", borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.04)",
+              background: "#141419", borderRadius: 2,
+              border: "1px solid rgba(255,255,255,0.06)",
               padding: "10px 14px",
               display: "flex", gap: 24, flexWrap: "wrap",
               fontSize: 13, color: "#6b7280",

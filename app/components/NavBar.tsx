@@ -7,49 +7,73 @@ export default function NavBar() {
   return (
     <nav
       style={{
-        background: "#111118",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        padding: "0 20px",
+        padding: "0 24px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        height: 44,
+        height: 56,
         position: "sticky",
         top: 0,
         zIndex: 100,
+        background: "transparent",
       }}
     >
+      {/* Left: TOPBET wordmark */}
       <Link href="/" style={{ textDecoration: "none" }}>
-        <span style={{ fontWeight: 700, fontSize: 16, color: "white" }}>
-          🏆 TopBet
+        <span
+          style={{
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: 12,
+            letterSpacing: "0.2em",
+            color: "#444444",
+            textTransform: "uppercase",
+          }}
+        >
+          TOPBET
         </span>
       </Link>
-      <div style={{ display: "flex", gap: 4 }}>
+
+      {/* Center: nav links */}
+      <div style={{ display: "flex", gap: 28 }}>
         {[
-          { href: "/", label: "Dashboard" },
-          { href: "/picks", label: "Picks 🎯" },
-          { href: "/parlays", label: "🎰 Parlays" },
+          { href: "/", label: "Matches" },
+          { href: "/picks", label: "Picks" },
+          { href: "/parlays", label: "Parlays" },
+          { href: "/stats", label: "Stats" },
           { href: "/tracker", label: "Tracker" },
-          { href: "/stats", label: "📊 Stats" },
-          { href: "/about", label: "🧠 How It Works" },
         ].map(({ href, label }) => (
           <Link
             key={href}
             href={href}
             style={{
               textDecoration: "none",
-              padding: "4px 12px",
-              borderRadius: 6,
               fontSize: 13,
-              fontWeight: path === href ? 600 : 400,
-              background: path === href ? "#7c3aed" : "transparent",
-              color: path === href ? "white" : "#9ca3af",
+              fontWeight: 400,
+              color: path === href ? "#e8e0d0" : "#44444f",
+              transition: "color 0.15s",
             }}
           >
             {label}
           </Link>
         ))}
       </div>
+
+      {/* Right: CTA */}
+      <Link
+        href="/picks"
+        style={{
+          textDecoration: "none",
+          fontSize: 11,
+          fontFamily: "var(--font-dm-mono), monospace",
+          letterSpacing: "0.05em",
+          color: "#888899",
+          border: "1px solid rgba(255,255,255,0.06)",
+          padding: "5px 12px",
+          borderRadius: 2,
+        }}
+      >
+        View Picks
+      </Link>
     </nav>
   );
 }
