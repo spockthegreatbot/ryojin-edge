@@ -9,6 +9,8 @@ interface BreakdownRow {
   pending: number
   pnl: number
   staked: number
+  avg_closing_odds?: number | null
+  avg_clv?: number | null
 }
 
 interface SportRow extends BreakdownRow { sport: string }
@@ -70,7 +72,7 @@ function SectionTable<T extends BreakdownRow>({
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                {['Name', 'Total', 'W', 'L', 'Pending', 'P&L', 'ROI%'].map(h => (
+                {['Name', 'Total', 'W', 'L', 'Pending', 'P&L', 'ROI%', 'Closing', 'CLV'].map(h => (
                   <th key={h} style={{
                     padding: '8px 10px',
                     textAlign: h === 'Name' ? 'left' : 'right',
@@ -95,6 +97,17 @@ function SectionTable<T extends BreakdownRow>({
                   </td>
                   <td style={{ padding: '9px 10px', textAlign: 'right' }}>
                     <RoiCell pnl={Number(row.pnl)} staked={Number(row.staked)} wins={row.wins} />
+                  </td>
+                  <td style={{ padding: '9px 10px', textAlign: 'right', fontFamily: 'monospace', color: '#6b7280' }}>
+                    {row.avg_closing_odds != null ? Number(row.avg_closing_odds).toFixed(2) : '—'}
+                  </td>
+                  <td style={{ padding: '9px 10px', textAlign: 'right', fontFamily: 'monospace' }}>
+                    {row.avg_clv != null
+                      ? <span style={{ color: Number(row.avg_clv) >= 0 ? '#22c55e' : '#ef4444' }}>
+                          {Number(row.avg_clv) >= 0 ? '+' : ''}{(Number(row.avg_clv) * 100).toFixed(1)}%
+                        </span>
+                      : <span style={{ color: '#4b5563' }}>—</span>
+                    }
                   </td>
                 </tr>
               ))}

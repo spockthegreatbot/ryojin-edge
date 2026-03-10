@@ -594,6 +594,17 @@ export async function GET() {
 
     const ufcEvents = await getUFCEvents();
     for (const ev of ufcEvents) {
+      // Skip fights with null/unparseable kickoff — never fall back to now()
+      if (!ev.startTime) {
+        console.warn(`[matches] Skipping UFC fight ${ev.homeTeam} vs ${ev.awayTeam} (id=${ev.id}) — null kickoff from Cloudbet`);
+        continue;
+      }
+      const kickoffMs = new Date(ev.startTime).getTime();
+      if (isNaN(kickoffMs)) {
+        console.warn(`[matches] Skipping UFC fight ${ev.homeTeam} vs ${ev.awayTeam} (id=${ev.id}) — unparseable kickoff: ${ev.startTime}`);
+        continue;
+      }
+
       // Fetch fighter stats in parallel from ESPN
       const { f1: homeStats, f2: awayStats } = await getFightStats(ev.homeTeam, ev.awayTeam);
 
@@ -609,7 +620,7 @@ export async function GET() {
         league: ev.name.includes("PFL") ? "PFL" : "UFC",
         homeTeam: ev.homeTeam,
         awayTeam: ev.awayTeam,
-        commenceTime: ev.startTime ?? new Date().toISOString(),
+        commenceTime: ev.startTime,
         homeOdds: ev.homeOdds,
         awayOdds: ev.awayOdds,
         homeForm: [],

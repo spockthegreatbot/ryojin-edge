@@ -35,6 +35,9 @@ interface Pick {
   eloHome?: number;
   eloAway?: number;
   eloGap?: number;
+  // CLV tracking
+  closing_odds?: number | null;
+  clv?: number | null;
 }
 
 const CORS_HEADERS = {
@@ -138,6 +141,27 @@ export async function GET(request: Request) {
           )
           ON CONFLICT (match_id, market, pick) DO NOTHING
         `;
+      }
+
+      // Merge closing_odds and clv from DB into picks response
+      if (picks.length > 0) {
+        const matchIds = [...new Set(picks.map(p => p.matchId))];
+        const dbRows = await sql`
+          SELECT match_id, market, pick, closing_odds, clv
+          FROM picks
+          WHERE match_id = ANY(${matchIds})
+            AND closing_odds IS NOT NULL
+        ` as Array<{ match_id: string; market: string; pick: string; closing_odds: number | null; clv: number | null }>;
+
+        const clvMap = new Map(dbRows.map(r => [`${r.match_id}::${r.market}::${r.pick}`, r]));
+        for (const p of picks) {
+          const key = `${p.matchId}::${p.market}::${p.pick}`;
+          const row = clvMap.get(key);
+          if (row) {
+            p.closing_odds = row.closing_odds;
+            p.clv = row.clv;
+          }
+        }
       }
     } catch (e) {
       // Non-fatal — don't break the picks endpoint if DB is down

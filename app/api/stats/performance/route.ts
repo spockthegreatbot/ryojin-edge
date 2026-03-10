@@ -16,7 +16,9 @@ export async function GET() {
       SUM(CASE WHEN outcome = 'loss' THEN 1 ELSE 0 END) as losses,
       SUM(CASE WHEN outcome IS NULL THEN 1 ELSE 0 END) as pending,
       ROUND(SUM(COALESCE(result, 0))::numeric, 2) as pnl,
-      ROUND(SUM(COALESCE(stake, 10))::numeric, 2) as staked
+      ROUND(SUM(COALESCE(stake, 10))::numeric, 2) as staked,
+      ROUND(AVG(closing_odds)::numeric, 4) as avg_closing_odds,
+      ROUND(AVG(clv)::numeric, 4) as avg_clv
     FROM picks
     WHERE sport IS NOT NULL
     GROUP BY sport
@@ -32,7 +34,9 @@ export async function GET() {
       SUM(CASE WHEN outcome = 'loss' THEN 1 ELSE 0 END) as losses,
       SUM(CASE WHEN outcome IS NULL THEN 1 ELSE 0 END) as pending,
       ROUND(SUM(COALESCE(result, 0))::numeric, 2) as pnl,
-      ROUND(SUM(COALESCE(stake, 10))::numeric, 2) as staked
+      ROUND(SUM(COALESCE(stake, 10))::numeric, 2) as staked,
+      ROUND(AVG(closing_odds)::numeric, 4) as avg_closing_odds,
+      ROUND(AVG(clv)::numeric, 4) as avg_clv
     FROM picks
     GROUP BY market
     ORDER BY total DESC
@@ -53,7 +57,9 @@ export async function GET() {
       SUM(CASE WHEN outcome = 'loss' THEN 1 ELSE 0 END) as losses,
       SUM(CASE WHEN outcome IS NULL THEN 1 ELSE 0 END) as pending,
       ROUND(SUM(COALESCE(result, 0))::numeric, 2) as pnl,
-      ROUND(SUM(COALESCE(stake, 10))::numeric, 2) as staked
+      ROUND(SUM(COALESCE(stake, 10))::numeric, 2) as staked,
+      ROUND(AVG(closing_odds)::numeric, 4) as avg_closing_odds,
+      ROUND(AVG(clv)::numeric, 4) as avg_clv
     FROM picks
     WHERE edge IS NOT NULL
     GROUP BY tier
