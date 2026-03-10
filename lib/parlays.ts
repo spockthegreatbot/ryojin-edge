@@ -8,7 +8,7 @@ export interface Parlay {
   combinedEdgePct: string;
   tier: string;
   kellySuggestion: string;
-  strategy: 'high-confidence' | 'value-accumulator' | 'power-parlay' | 'league-spread';
+  strategy: 'best-bets' | 'value-accumulator' | 'league-spread';
   reason: string;
 }
 
@@ -42,9 +42,8 @@ function computeParlay(legs: ParlayLeg[]): {
 
 function tierForStrategy(strategy: Parlay['strategy']): string {
   switch (strategy) {
-    case 'high-confidence': return '🎯 High Confidence';
+    case 'best-bets': return '⚡ Best Bets';
     case 'value-accumulator': return '💰 Value Accumulator';
-    case 'power-parlay': return '🚀 Power Parlay';
     case 'league-spread': return '🌍 League Spread';
   }
 }
@@ -102,15 +101,15 @@ export function buildParlays(
     return true;
   }
 
-  // --- Strategy A: High Confidence ---
-  // Candidates: edge ≥ 3%, odds > 1.10; sorted by modelProb descending
+  // --- Strategy A: Best Bets (High Confidence × Good Odds × Positive Edge) ---
+  // Composite score: modelProb × edge × odds — rewards legs that are both likely AND return well
+  // Filters: modelProb ≥ 50%, odds ≥ 1.35, edge ≥ 5%
   {
     const cands = allCandidates
-      .filter(l => l.rawEdge >= 0.03 && l.odds > 1.10)
-      .sort((a, b) => b.modelProb - a.modelProb)
+      .filter(l => l.modelProb >= 0.50 && l.odds >= 1.35 && l.rawEdge >= 0.05)
+      .sort((a, b) => (b.modelProb * b.rawEdge * b.odds) - (a.modelProb * a.rawEdge * a.odds))
       .slice(0, 30);
 
-    // Greedy pick: top N from DIFFERENT matches (optimal since sorted by modelProb desc)
     function greedyPick(n: number): CandidateLeg[] {
       const result: CandidateLeg[] = [];
       for (const c of cands) {
@@ -121,23 +120,25 @@ export function buildParlays(
       return result;
     }
 
+    // 2-leg Best Bet
     const top2 = greedyPick(2);
     if (top2.length === 2) {
-      const { combinedProb } = computeParlay(top2);
-      if (combinedProb >= 38) {
+      const { combinedProb, combinedOdds } = computeParlay(top2);
+      if (combinedProb >= 32) {
         const [a, b] = top2;
-        const reason = `Both legs carry ${Math.round(a.modelProb * 100)}%/${Math.round(b.modelProb * 100)}% win probability. High-floor double targeting consistent outcomes over big odds.`;
-        tryAdd(top2, 'high-confidence', reason);
+        const reason = `${Math.round(a.modelProb * 100)}%/${Math.round(b.modelProb * 100)}% win probability at ${a.odds.toFixed(2)}/${b.odds.toFixed(2)} odds. High confidence legs with strong R/R — not just short-priced, not just high edge.`;
+        tryAdd(top2, 'best-bets', reason);
       }
     }
 
+    // 3-leg Best Bet
     const top3 = greedyPick(3);
     if (top3.length === 3) {
-      const { combinedProb } = computeParlay(top3);
-      if (combinedProb >= 28) {
+      const { combinedProb, combinedOdds } = computeParlay(top3);
+      if (combinedProb >= 22) {
         const [a, b, c] = top3;
-        const reason = `Top 3 by win probability: ${Math.round(a.modelProb * 100)}%/${Math.round(b.modelProb * 100)}%/${Math.round(c.modelProb * 100)}%. High-floor treble targeting consistent outcomes.`;
-        tryAdd(top3, 'high-confidence', reason);
+        const reason = `${Math.round(a.modelProb * 100)}%/${Math.round(b.modelProb * 100)}%/${Math.round(c.modelProb * 100)}% win probability at ${combinedOdds.toFixed(1)}x combined. Balanced treble — high win rate AND meaningful return.`;
+        tryAdd(top3, 'best-bets', reason);
       }
     }
   }
@@ -197,37 +198,7 @@ export function buildParlays(
     }
   }
 
-  // --- Strategy C: Power Parlay ---
-  // Candidates: edge ≥ 5%, odds 1.50–4.50; optimize combinedOdds × combinedEdge
-  {
-    const cands = allCandidates
-      .filter(l => l.rawEdge >= 0.05 && l.odds >= 1.50 && l.odds <= 4.50)
-      .slice(0, 30);
-
-    const results: { legs: CandidateLeg[]; score: number; combinedOdds: number }[] = [];
-    for (let i = 0; i < cands.length; i++) {
-      for (let j = i + 1; j < cands.length; j++) {
-        for (let k = j + 1; k < cands.length; k++) {
-          const a = cands[i], b = cands[j], c = cands[k];
-          if (a.match === b.match || b.match === c.match || a.match === c.match) continue;
-          const { combinedOdds, combinedEdge } = computeParlay([a, b, c]);
-          if (combinedEdge <= 0 || combinedOdds < 5.0) continue;
-          results.push({ legs: [a, b, c], score: combinedOdds * combinedEdge, combinedOdds });
-        }
-      }
-    }
-    results.sort((a, b) => b.score - a.score);
-
-    let added = 0;
-    for (const r of results) {
-      if (added >= 2) break;
-      const leagues = [...new Set(r.legs.map(l => l.league))].join(', ');
-      const reason = `High R/R accumulator. Combined odds ${r.combinedOdds.toFixed(1)}x with positive model edge across ${leagues}.`;
-      if (tryAdd(r.legs, 'power-parlay', reason)) added++;
-    }
-  }
-
-  // --- Strategy D: League Spread ---
+    // --- Strategy D: League Spread ---
   // Best bet per league (highest rawEdge); build 3-leg from different leagues
   {
     const leagueMap = new Map<string, CandidateLeg>();

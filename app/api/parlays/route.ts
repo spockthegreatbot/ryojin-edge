@@ -56,9 +56,9 @@ export async function GET(request: Request) {
     summary: {
       total: parlays.length,
       byStrategy: {
-        highConfidence: parlays.filter(p => p.strategy === 'high-confidence').length,
+        highConfidence: parlays.filter(p => p.strategy === 'best-bets').length,
         valueAccumulator: parlays.filter(p => p.strategy === 'value-accumulator').length,
-        powerParlay: parlays.filter(p => p.strategy === 'power-parlay').length,
+        powerParlay: parlays.filter(p => p.strategy === 'best-bets').length,
         leagueSpread: parlays.filter(p => p.strategy === 'league-spread').length,
       },
     },

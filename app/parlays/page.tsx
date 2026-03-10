@@ -56,15 +56,13 @@ function TierBadge({ tier }: { tier: string }) {
 
 function StrategyChip({ strategy }: { strategy: Parlay['strategy'] }) {
   const labels: Record<Parlay['strategy'], string> = {
-    'high-confidence': 'HIGH CONFIDENCE',
+    'best-bets': 'BEST BETS',
     'value-accumulator': 'VALUE ACCUMULATOR',
-    'power-parlay': 'POWER PARLAY',
     'league-spread': 'LEAGUE SPREAD',
   };
   const colors: Record<Parlay['strategy'], string> = {
-    'high-confidence': '#60a5fa',
+    'best-bets': '#f59e0b',
     'value-accumulator': '#22c55e',
-    'power-parlay': '#a855f7',
     'league-spread': '#f59e0b',
   };
   return (
@@ -272,9 +270,8 @@ const STRATEGY_SECTIONS: Array<{
   label: string;
   color: string;
 }> = [
-  { key: 'high-confidence',  label: '🎯 High Confidence',   color: '#60a5fa' },
+  { key: 'best-bets', label: '⚡ Best Bets', color: '#f59e0b' },
   { key: 'value-accumulator', label: '💰 Value Accumulators', color: '#22c55e' },
-  { key: 'power-parlay',     label: '🚀 Power Parlays',      color: '#a855f7' },
   { key: 'league-spread',    label: '🌍 League Spread',      color: '#f59e0b' },
 ];
 
