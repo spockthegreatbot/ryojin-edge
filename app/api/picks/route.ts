@@ -28,6 +28,11 @@ interface Pick {
   tier: string;
   reasoning: string;
   kellySuggestion: string | null;
+  factors?: { label: string; impact: number; direction: "+" | "-" | "=" }[];
+  refereeNote?: string;
+  // Form data for streak badges
+  homeForm: string[];
+  awayForm: string[];
   // xG context (Task 3)
   homeXg?: number;
   awayXg?: number;
@@ -106,6 +111,10 @@ export async function GET(request: Request) {
         tier: bet.tier,
         reasoning: bet.reasoning,
         kellySuggestion: bet.kellySuggestion ?? null,
+        factors: bet.factors,
+        refereeNote: bet.refereeNote,
+        homeForm: match.homeForm ?? [],
+        awayForm: match.awayForm ?? [],
         homeXg: match.xgHome > 0 ? match.xgHome : undefined,
         awayXg: match.xgAway > 0 ? match.xgAway : undefined,
         eloHome,

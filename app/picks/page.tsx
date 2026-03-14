@@ -3,54 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { MatchData } from "@/lib/mock-data";
-
-// ── Collapsible "How are these scored?" ──────────────────────────────────────
-function HowScoredExplainer() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={{
-      marginBottom: 20,
-      background: "#141419",
-      borderRadius: 2,
-      border: "1px solid rgba(255,255,255,0.06)",
-      overflow: "hidden",
-    }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "12px 16px", background: "none", border: "none",
-          cursor: "pointer", textAlign: "left",
-        }}
-      >
-        <span style={{ fontSize: 13, fontWeight: 600, color: "#e8e0d0" }}>
-          How are these scored?
-        </span>
-        <span style={{ fontSize: 16, color: "#4b5563", transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▾</span>
-      </button>
-      {open && (
-        <div style={{
-          padding: "0 16px 14px",
-          borderTop: "1px solid rgba(124,58,237,0.12)",
-        }}>
-          <p style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.7, margin: "12px 0 6px" }}>
-            Picks are ranked by <strong style={{ color: "white" }}>edge %</strong> — the gap between our Poisson+Elo model probability and Pinnacle&apos;s de-vigged market price.
-          </p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: "#f97316", background: "#1f1610", padding: "3px 10px", borderRadius: 5, fontWeight: 600 }}>🔥 Edge ≥10% = Strong</span>
-            <span style={{ fontSize: 12, color: "#22c55e", background: "#0f1a14", padding: "3px 10px", borderRadius: 5, fontWeight: 600 }}>✅ Edge 5–10% = Lean</span>
-            <span style={{ fontSize: 12, color: "#9ca3af" }}>Kelly Criterion sizing shown per pick.</span>
-          </div>
-          <Link href="/about" style={{ fontSize: 12, color: "#e8e0d0", textDecoration: "none", fontWeight: 500 }}>
-            Full methodology → /about
-          </Link>
-        </div>
-      )}
-    </div>
-  );
-}
 import { BetSuggestion, FactorBreakdown } from "@/lib/bet-analyzer";
+import { Parlay } from "@/lib/parlays";
 
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface MatchWithBets extends MatchData {
   bets?: BetSuggestion[];
@@ -59,12 +15,54 @@ interface MatchWithBets extends MatchData {
 interface ValueBet extends BetSuggestion {
   matchId: string;
   matchName: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeForm: string[];
+  awayForm: string[];
   commenceTime: string;
   sport: "soccer" | "nba" | "nrl" | "ufc";
   league: string;
+  closing_odds?: number | null;
+  clv?: number | null;
 }
 
-type SortMode = "date" | "edge";
+type SortMode = "date" | "edge" | "confidence";
+
+// ── Confidence Tier Logic ────────────────────────────────────────────────────
+
+type ConfidenceTier = "lock" | "strong" | "speculative";
+
+function getConfidenceTier(confidence: number, edge: number): ConfidenceTier {
+  if (confidence >= 85 && edge >= 0.15) return "lock";
+  if (confidence >= 70 && edge >= 0.10) return "strong";
+  return "speculative";
+}
+
+const TIER_CONFIG = {
+  lock: {
+    label: "🔒 LOCK",
+    color: "#E8C96E",
+    bg: "rgba(232,201,110,0.12)",
+    border: "rgba(232,201,110,0.3)",
+    description: "These are the strongest plays",
+  },
+  strong: {
+    label: "🎯 STRONG",
+    color: "#22c55e",
+    bg: "rgba(34,197,94,0.10)",
+    border: "rgba(34,197,94,0.25)",
+    description: "Good value, solid edge",
+  },
+  speculative: {
+    label: "⚡ SPEC",
+    color: "#9ca3af",
+    bg: "rgba(156,163,175,0.08)",
+    border: "rgba(156,163,175,0.15)",
+    description: "Higher risk, potential upside",
+  },
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatKickoff(iso: string) {
   return new Date(iso).toLocaleString("en-AU", {
@@ -78,20 +76,66 @@ function formatKickoff(iso: string) {
   });
 }
 
-function TierBadge({ tier }: { tier: string }) {
-  const map: Record<string, { color: string; bg: string }> = {
-    "🔥 Strong":    { color: "#f97316", bg: "#1f1610" },
-    "✅ Lean":      { color: "#22c55e", bg: "#0f1a14" },
-    "⚠️ Marginal":  { color: "#eab308", bg: "#1a1810" },
-  };
-  const style = map[tier] ?? { color: "#9ca3af", bg: "#18181e" };
+function getFormStreak(form: string[]): { type: "W" | "L" | "D"; count: number } | null {
+  if (!form || form.length === 0) return null;
+  const reversed = [...form].reverse();
+  const streakType = reversed[0] as "W" | "L" | "D";
+  let count = 0;
+  for (const f of reversed) {
+    if (f === streakType) count++;
+    else break;
+  }
+  if (count < 2) return null;
+  return { type: streakType, count };
+}
+
+function StreakBadge({ form }: { form: string[] }) {
+  const streak = getFormStreak(form);
+  if (!streak) return null;
+  const color = streak.type === "W" ? "#22c55e" : streak.type === "L" ? "#ef4444" : "#eab308";
+  const bg = streak.type === "W" ? "#0f1a14" : streak.type === "L" ? "#1a0f0f" : "#1a1810";
   return (
     <span style={{
-      fontSize: 11, fontWeight: 600,
-      color: style.color, background: style.bg,
-      padding: "2px 8px", borderRadius: 5,
+      fontSize: 10, fontWeight: 700,
+      color, background: bg,
+      padding: "2px 5px", borderRadius: 3,
+      fontFamily: "var(--font-dm-mono), monospace",
     }}>
-      {tier}
+      {streak.type}{streak.count}
+    </span>
+  );
+}
+
+function CLVIndicator({ clv, closingOdds }: { clv?: number | null; closingOdds?: number | null }) {
+  if (clv === undefined || clv === null) return null;
+  const favorable = clv > 0;
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 600,
+      color: favorable ? "#22c55e" : "#ef4444",
+      display: "inline-flex", alignItems: "center", gap: 3,
+    }}>
+      {favorable ? "↗" : "↘"} {favorable ? "Line moving our way" : "Line moving against"}
+      {closingOdds && <span style={{ color: "#4b5563", fontSize: 9 }}> (close: {closingOdds.toFixed(2)})</span>}
+    </span>
+  );
+}
+
+// ── Tier Badge ───────────────────────────────────────────────────────────────
+
+function TierBadge({ bet }: { bet: ValueBet }) {
+  const tier = getConfidenceTier(bet.confidence, bet.edge);
+  const cfg = TIER_CONFIG[tier];
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700,
+      color: cfg.color, background: cfg.bg,
+      padding: "3px 8px", borderRadius: 4,
+      border: `1px solid ${cfg.border}`,
+      letterSpacing: "0.05em",
+      textTransform: "uppercase",
+    }}>
+      {cfg.label}
     </span>
   );
 }
@@ -99,222 +143,374 @@ function TierBadge({ tier }: { tier: string }) {
 function FactorTags({ factors }: { factors: FactorBreakdown[] }) {
   const dirColor = (d: "+" | "-" | "=") =>
     d === "+" ? "#22c55e" : d === "-" ? "#ef4444" : "#6b7280";
-  const dirIcon = (d: "+" | "-" | "=") =>
-    d === "+" ? "📈" : d === "-" ? "📉" : "➖";
-
   return (
-    <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 8 }}>
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
       {factors.map((f, i) => (
         <span key={i} style={{
-          fontSize: 10,
+          fontSize: 9,
           color: dirColor(f.direction),
           background: f.direction === "+" ? "#0f1a14" : f.direction === "-" ? "#1a1010" : "#15151e",
-          borderRadius: 4,
-          padding: "2px 6px",
+          borderRadius: 3,
+          padding: "2px 5px",
           fontWeight: 500,
           whiteSpace: "nowrap",
         }}>
-          {dirIcon(f.direction)} {f.label} {f.direction}{Math.abs(Math.round(f.impact * 100))}%
+          {f.direction === "+" ? "📈" : f.direction === "-" ? "📉" : "➖"} {f.label}
         </span>
       ))}
     </div>
   );
 }
 
-// ── Hero card for the best single pick ─────────────────────────────────────
-function HeroPick({ bet }: { bet: ValueBet }) {
+// ── Best Bets Hero Section (Top 3) ──────────────────────────────────────────
+
+function BestBetsHero({ bets }: { bets: ValueBet[] }) {
+  if (bets.length === 0) return null;
+
   return (
-    <Link href={`/match/${bet.matchId}`} style={{ textDecoration: "none", display: "block", marginBottom: 28 }}>
+    <div style={{ marginBottom: 28 }}>
       <div style={{
-        background: "#141419",
-        borderRadius: 2,
-        border: "1px solid rgba(255,255,255,0.06)",
-        padding: "20px 22px",
-        position: "relative",
-        overflow: "hidden",
-        cursor: "pointer",
-        transition: "border-color 0.2s",
-      }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.12)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.06)";
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ flex: 1 }}>
-            {/* Labels row */}
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
-              <span style={{
-                fontSize: 11, fontWeight: 700,
-                color: "#22c55e", background: "#0f1a14",
-                padding: "3px 10px", borderRadius: 5, border: "1px solid #1a3a2a",
-                textTransform: "uppercase", letterSpacing: 0.8,
-              }}>
-                🏆 Best Pick
-              </span>
-              <TierBadge tier={bet.tier} />
-              <span style={{ fontSize: 11, color: "#6b7280" }}>{bet.sport === "soccer" ? "⚽" : "🏀"} {bet.league}</span>
-            </div>
-
-            {/* Match name */}
-            <div style={{ fontSize: 14, color: "#9ca3af", marginBottom: 6 }}>{bet.matchName}</div>
-
-            {/* Market + pick */}
-            <div style={{ fontSize: 11, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{bet.market}</div>
-            <div style={{ fontSize: 28, fontWeight: 300, color: "#22c55e", marginBottom: 8, fontFamily: "var(--font-dm-mono), monospace" }}>{bet.pick}</div>
-
-            {/* Reasoning */}
-            <div style={{ fontSize: 13, color: "#9ca3af", lineHeight: 1.6, marginBottom: 8 }}>{bet.reasoning}</div>
-
-            {/* Factor tags */}
-            {bet.factors && bet.factors.length > 0 && <FactorTags factors={bet.factors} />}
-
-            {/* Kelly */}
-            <div style={{ marginTop: 10, fontSize: 12, color: "#22c55e", fontWeight: 600 }}>
-              📊 Kelly: {bet.kellySuggestion}
-            </div>
-
-            {/* Referee note */}
-            {bet.refereeNote && (
-              <div style={{ marginTop: 4, fontSize: 11, color: "#6b7280" }}>{bet.refereeNote}</div>
-            )}
-          </div>
-
-          {/* Stats column */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-end", minWidth: 120 }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 36, fontWeight: 300, color: "#22c55e", fontFamily: "var(--font-dm-mono), monospace" }}>+{(bet.edge * 100).toFixed(1)}%</div>
-              <div style={{ fontSize: 10, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.1em" }}>Edge</div>
-            </div>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 24, fontWeight: 300, color: "#e8e0d0", fontFamily: "var(--font-dm-mono), monospace" }}>{bet.confidence}%</div>
-              <div style={{ fontSize: 10, color: "#6b7280" }}>Confidence</div>
-            </div>
-            {bet.odds && (
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "white" }}>{bet.odds.toFixed(2)}</div>
-                <div style={{ fontSize: 10, color: "#6b7280" }}>Odds</div>
-              </div>
-            )}
-            <div style={{ textAlign: "right", fontSize: 11, color: "#4b5563" }}>
-              🕐 {formatKickoff(bet.commenceTime)}
-            </div>
-          </div>
-        </div>
-
-        {/* Probability bar */}
-        <div style={{ marginTop: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#4b5563", marginBottom: 4 }}>
-            <span>Model: {Math.round(bet.modelProb * 100)}%</span>
-            <span>Market: {Math.round(bet.marketProb * 100)}%</span>
-          </div>
-          <div style={{ background: "rgba(0,0,0,0.3)", borderRadius: 6, height: 8, position: "relative", overflow: "hidden" }}>
-            <div style={{ background: "rgba(34,197,94,0.25)", width: `${bet.marketProb * 100}%`, height: "100%", position: "absolute" }} />
-            <div style={{ background: "#22c55e", width: `${bet.modelProb * 100}%`, height: "100%", borderRadius: 6, opacity: 0.9 }} />
-          </div>
-        </div>
+        display: "flex", alignItems: "center", gap: 10,
+        marginBottom: 14,
+      }}>
+        <h2 style={{
+          fontSize: 16, fontWeight: 700, color: "#E8C96E",
+          margin: 0, letterSpacing: -0.3,
+        }}>
+          🏆 Best Bets Today
+        </h2>
+        <span style={{ fontSize: 11, color: "#4b5563" }}>
+          Top picks by confidence × edge
+        </span>
       </div>
-    </Link>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+        gap: 12,
+      }}>
+        {bets.map((bet, i) => (
+          <Link key={`best-${i}`} href={`/match/${bet.matchId}`} style={{ textDecoration: "none" }}>
+            <div style={{
+              background: "linear-gradient(135deg, #1a1814 0%, #141419 100%)",
+              borderRadius: 6,
+              border: `1px solid ${TIER_CONFIG[getConfidenceTier(bet.confidence, bet.edge)].border}`,
+              borderLeft: `3px solid ${TIER_CONFIG[getConfidenceTier(bet.confidence, bet.edge)].color}`,
+              padding: "16px 18px",
+              cursor: "pointer",
+              transition: "border-color 0.2s, transform 0.15s",
+              position: "relative",
+            }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(232,201,110,0.5)";
+                (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.borderColor = TIER_CONFIG[getConfidenceTier(bet.confidence, bet.edge)].border;
+                (e.currentTarget as HTMLDivElement).style.transform = "none";
+              }}
+            >
+              {/* Rank badge */}
+              <div style={{
+                position: "absolute", top: -8, right: 12,
+                background: "#E8C96E", color: "#0a0a0f",
+                fontSize: 10, fontWeight: 800,
+                padding: "2px 8px", borderRadius: 10,
+              }}>
+                #{i + 1}
+              </div>
+
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, gap: 8 }}>
+                <div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+                    <TierBadge bet={bet} />
+                    <span style={{ fontSize: 10, color: "#6b7280" }}>
+                      {bet.sport === "soccer" ? "⚽" : "🏀"} {bet.league}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "#e8e0d0", fontWeight: 600 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {bet.homeTeam} <StreakBadge form={bet.homeForm} />
+                    </span>
+                    <span style={{ color: "#4b5563", margin: "0 6px" }}>vs</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      {bet.awayTeam} <StreakBadge form={bet.awayForm} />
+                    </span>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{
+                    fontSize: 24, fontWeight: 300, color: "#22c55e",
+                    fontFamily: "var(--font-dm-mono), monospace",
+                  }}>
+                    +{(bet.edge * 100).toFixed(1)}%
+                  </div>
+                  <div style={{ fontSize: 9, color: "#44444f", textTransform: "uppercase" }}>Edge</div>
+                </div>
+              </div>
+
+              {/* Market + Pick */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 10, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.1em" }}>{bet.market}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#22c55e" }}>{bet.pick}</span>
+                {bet.odds && <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>@ {bet.odds.toFixed(2)}</span>}
+              </div>
+
+              {/* Reasoning */}
+              <p style={{
+                fontSize: 12, color: "#9ca3af", lineHeight: 1.5, margin: "0 0 8px",
+                display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+              }}>
+                {bet.reasoning}
+              </p>
+
+              {/* CLV + Kelly */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                <span style={{ fontSize: 11, color: "#E8C96E", fontWeight: 600 }}>📊 Kelly: {bet.kellySuggestion}</span>
+                <CLVIndicator clv={bet.clv} closingOdds={bet.closing_odds} />
+              </div>
+
+              {/* Stats bar */}
+              <div style={{ display: "flex", gap: 14, marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 400, color: "#e8e0d0", fontFamily: "var(--font-dm-mono), monospace" }}>{bet.confidence}%</span>
+                  <span style={{ fontSize: 9, color: "#44444f", marginLeft: 4 }}>Conf</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 400, color: "#9ca3af" }}>{Math.round(bet.modelProb * 100)}%</span>
+                  <span style={{ fontSize: 9, color: "#44444f", marginLeft: 4 }}>Model</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 400, color: "#4b5563" }}>{Math.round(bet.marketProb * 100)}%</span>
+                  <span style={{ fontSize: 9, color: "#44444f", marginLeft: 4 }}>Market</span>
+                </div>
+              </div>
+
+              {/* Kickoff */}
+              <div style={{ fontSize: 10, color: "#4b5563", marginTop: 6 }}>
+                🕐 {formatKickoff(bet.commenceTime)}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
-// ── Regular value bet card ──────────────────────────────────────────────────
+// ── Parlay Suggestion Section ───────────────────────────────────────────────
+
+function ParlaySuggestions({ parlays }: { parlays: Parlay[] }) {
+  if (!parlays || parlays.length === 0) return null;
+
+  // Show max 2 parlays — 2-leg ones from different leagues
+  const twoLeg = parlays.filter(p => p.legs.length === 2).slice(0, 2);
+  const display = twoLeg.length > 0 ? twoLeg : parlays.slice(0, 2);
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <h2 style={{ fontSize: 14, fontWeight: 700, color: "#9ca3af", margin: 0, textTransform: "uppercase", letterSpacing: 1 }}>
+          🎲 Multi-Bet Suggestions
+        </h2>
+        <span style={{ fontSize: 11, color: "#4b5563" }}>
+          Uncorrelated parlays from different leagues
+        </span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 12 }}>
+        {display.map((parlay, i) => (
+          <div key={`parlay-${i}`} style={{
+            background: "#141419",
+            borderRadius: 6,
+            border: "1px solid rgba(255,255,255,0.06)",
+            padding: "14px 16px",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <span style={{
+                fontSize: 10, fontWeight: 700, color: "#a855f7",
+                background: "rgba(168,85,247,0.12)", padding: "2px 8px",
+                borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.05em",
+              }}>
+                {parlay.legs.length}-Leg Parlay
+              </span>
+              <span style={{
+                fontSize: 18, fontWeight: 700, color: "#E8C96E",
+                fontFamily: "var(--font-dm-mono), monospace",
+              }}>
+                {parlay.combinedOdds.toFixed(2)}x
+              </span>
+            </div>
+
+            {/* Legs */}
+            {parlay.legs.map((leg, j) => (
+              <div key={`leg-${j}`} style={{
+                padding: "8px 0",
+                borderBottom: j < parlay.legs.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+              }}>
+                <div style={{ fontSize: 12, color: "#e8e0d0", fontWeight: 600, marginBottom: 2 }}>
+                  {leg.match}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#22c55e" }}>
+                    {leg.pick} @ {leg.odds.toFixed(2)}
+                  </span>
+                  <span style={{ fontSize: 10, color: "#6b7280" }}>
+                    {leg.edgePct} edge · {leg.league}
+                  </span>
+                </div>
+              </div>
+            ))}
+
+            {/* Summary */}
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)",
+            }}>
+              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                Combined prob: {parlay.combinedProb}%
+              </div>
+              <div style={{
+                fontSize: 12, fontWeight: 700,
+                color: parlay.combinedEdge > 0 ? "#22c55e" : "#ef4444",
+              }}>
+                Edge: {parlay.combinedEdgePct}
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: "#6b7280", marginTop: 4 }}>
+              {parlay.reason}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Regular Value Bet Card ──────────────────────────────────────────────────
+
 function ValueBetCard({ bet }: { bet: ValueBet }) {
+  const tier = getConfidenceTier(bet.confidence, bet.edge);
+  const cfg = TIER_CONFIG[tier];
+
   return (
     <Link href={`/match/${bet.matchId}`} style={{ textDecoration: "none" }}>
       <div style={{
         background: "#141419",
-        borderRadius: 2,
-        border: "1px solid rgba(255,255,255,0.06)",
+        borderRadius: 6,
+        border: `1px solid ${cfg.border}`,
+        borderLeft: tier === "lock" ? `3px solid ${cfg.color}` : `1px solid ${cfg.border}`,
         padding: "14px 16px",
         height: "100%",
         display: "flex",
         flexDirection: "column",
         cursor: "pointer",
-        transition: "border-color 0.2s",
+        transition: "border-color 0.2s, transform 0.15s",
       }}
         onMouseEnter={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.12)";
+          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.15)";
+          (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.06)";
+          (e.currentTarget as HTMLDivElement).style.borderColor = cfg.border;
+          (e.currentTarget as HTMLDivElement).style.transform = "none";
         }}
       >
-        {/* Match + kickoff */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{bet.matchName}</div>
-            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-              🕐 {formatKickoff(bet.commenceTime)} AEDT
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+              <TierBadge bet={bet} />
+              <span style={{ fontSize: 10, color: "#6b7280" }}>
+                {bet.sport === "soccer" ? "⚽" : bet.sport === "nba" ? "🏀" : "🏈"} {bet.league}
+              </span>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {bet.homeTeam} <StreakBadge form={bet.homeForm} />
+              </span>
+              <span style={{ color: "#4b5563", margin: "0 4px" }}>vs</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {bet.awayTeam} <StreakBadge form={bet.awayForm} />
+              </span>
+            </div>
+            <div style={{ fontSize: 10, color: "#4b5563", marginTop: 3 }}>
+              🕐 {formatKickoff(bet.commenceTime)}
             </div>
           </div>
-          <TierBadge tier={bet.tier} />
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{
+              fontSize: 18, fontWeight: 300,
+              color: cfg.color,
+              fontFamily: "var(--font-dm-mono), monospace",
+            }}>
+              +{(bet.edge * 100).toFixed(1)}%
+            </div>
+            <div style={{ fontSize: 9, color: "#44444f", textTransform: "uppercase" }}>Edge</div>
+          </div>
         </div>
 
         {/* Market + pick */}
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
-          <span style={{
-            fontSize: 10, color: "#44444f", textTransform: "uppercase",
-            letterSpacing: "0.1em", fontWeight: 500,
-          }}>
-            {bet.market}
-          </span>
-          <span style={{ fontSize: 16, fontWeight: 700, color: "#22c55e" }}>{bet.pick}</span>
+          <span style={{ fontSize: 10, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.1em" }}>{bet.market}</span>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#22c55e" }}>{bet.pick}</span>
+          {bet.odds && <span style={{ fontSize: 13, fontWeight: 700, color: "white" }}>@ {bet.odds.toFixed(2)}</span>}
         </div>
 
         {/* Reasoning */}
-        <div style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.5, marginBottom: 8, flex: 1 }}>
+        <p style={{
+          fontSize: 12, color: "#9ca3af", lineHeight: 1.5, margin: "0 0 8px", flex: 1,
+          display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+        }}>
           {bet.reasoning}
-        </div>
+        </p>
 
         {/* Factor tags */}
         {bet.factors && bet.factors.length > 0 && <FactorTags factors={bet.factors} />}
 
-        {/* Kelly */}
-        <div style={{ marginTop: 8, fontSize: 11, color: "#22c55e", fontWeight: 600 }}>
-          📊 Kelly: {bet.kellySuggestion}
+        {/* Kelly + CLV */}
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          marginTop: 8, flexWrap: "wrap", gap: 4,
+        }}>
+          <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>📊 {bet.kellySuggestion}</span>
+          <CLVIndicator clv={bet.clv} closingOdds={bet.closing_odds} />
         </div>
 
         {/* Referee note */}
         {bet.refereeNote && (
-          <div style={{ marginTop: 3, fontSize: 10, color: "#4b5563" }}>{bet.refereeNote}</div>
+          <div style={{ marginTop: 4, fontSize: 10, color: "#4b5563" }}>{bet.refereeNote}</div>
         )}
 
         {/* Stats row */}
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 16, fontWeight: 400, color: "#22c55e", fontFamily: "var(--font-dm-mono), monospace" }}>+{(bet.edge * 100).toFixed(1)}%</div>
-            <div style={{ fontSize: 9, color: "#44444f", textTransform: "uppercase", letterSpacing: "0.1em" }}>Edge</div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 400, color: cfg.color, fontFamily: "var(--font-dm-mono), monospace" }}>{bet.confidence}%</span>
+            <span style={{ fontSize: 9, color: "#44444f", marginLeft: 3 }}>Conf</span>
           </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 16, fontWeight: 400, color: "#e8e0d0", fontFamily: "var(--font-dm-mono), monospace" }}>{bet.confidence}%</div>
-            <div style={{ fontSize: 9, color: "#44444f" }}>Conf</div>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 400, color: "#9ca3af", fontFamily: "var(--font-dm-mono), monospace" }}>{Math.round(bet.modelProb * 100)}%</span>
+            <span style={{ fontSize: 9, color: "#44444f", marginLeft: 3 }}>Model</span>
+          </div>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 400, color: "#4b5563", fontFamily: "var(--font-dm-mono), monospace" }}>{Math.round(bet.marketProb * 100)}%</span>
+            <span style={{ fontSize: 9, color: "#44444f", marginLeft: 3 }}>Market</span>
           </div>
           {bet.odds && (
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "white" }}>{bet.odds.toFixed(2)}</div>
-              <div style={{ fontSize: 9, color: "#6b7280" }}>Odds</div>
+            <div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "white" }}>{bet.odds.toFixed(2)}</span>
+              <span style={{ fontSize: 9, color: "#6b7280", marginLeft: 3 }}>Odds</span>
             </div>
           )}
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#9ca3af" }}>{Math.round(bet.modelProb * 100)}%</div>
-            <div style={{ fontSize: 9, color: "#6b7280" }}>Model</div>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#4b5563" }}>{Math.round(bet.marketProb * 100)}%</div>
-            <div style={{ fontSize: 9, color: "#6b7280" }}>Market</div>
-          </div>
         </div>
 
         {/* Confidence bar */}
-        <div style={{ marginTop: 8 }}>
-          <div style={{ background: "#0a0a0f", borderRadius: 4, height: 5, overflow: "hidden" }}>
+        <div style={{ marginTop: 6 }}>
+          <div style={{ background: "#0a0a0f", borderRadius: 3, height: 4, overflow: "hidden" }}>
             <div style={{
-              background: bet.confidence > 70 ? "#22c55e" : "#e8e0d0",
+              background: cfg.color,
               width: `${bet.confidence}%`, height: "100%",
               transition: "width 0.4s",
+              opacity: 0.7,
             }} />
           </div>
         </div>
@@ -323,14 +519,87 @@ function ValueBetCard({ bet }: { bet: ValueBet }) {
   );
 }
 
+// ── Tier Section ────────────────────────────────────────────────────────────
+
+function TierSection({ tier, bets }: { tier: ConfidenceTier; bets: ValueBet[] }) {
+  if (bets.length === 0) return null;
+  const cfg = TIER_CONFIG[tier];
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+        <h2 style={{
+          fontSize: 14, fontWeight: 700, color: cfg.color,
+          margin: 0, textTransform: "uppercase", letterSpacing: 1.2,
+        }}>
+          {cfg.label}
+        </h2>
+        <span style={{ fontSize: 11, color: "#4b5563", fontFamily: "var(--font-dm-mono), monospace" }}>
+          {bets.length} pick{bets.length !== 1 ? "s" : ""}
+        </span>
+        <span style={{ fontSize: 11, color: "#44444f" }}>— {cfg.description}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12 }}>
+        {bets.map((bet, i) => (
+          <ValueBetCard key={`${tier}-${i}`} bet={bet} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ───────────────────────────────────────────────────────────────
+
 export default function PicksPage() {
   const [valueBets, setValueBets] = useState<ValueBet[]>([]);
+  const [parlays, setParlays] = useState<Parlay[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [sortMode, setSortMode] = useState<SortMode>("date");
+  const [sortMode, setSortMode] = useState<SortMode>("edge");
 
   const fetchPicks = useCallback(async () => {
     try {
+      // Fetch picks from API (includes parlays)
+      const picksRes = await fetch("/api/picks");
+      if (picksRes.ok) {
+        const data = await picksRes.json();
+        const picks = data.picks ?? [];
+        setParlays(data.parlays ?? []);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const allValue: ValueBet[] = picks.map((p: any) => ({
+          market: p.market,
+          pick: p.pick,
+          confidence: p.confidence,
+          edge: p.edge,
+          modelProb: p.modelProb,
+          marketProb: p.marketProb,
+          odds: p.odds,
+          value: true,
+          reasoning: p.reasoning,
+          tier: p.tier,
+          kellySuggestion: p.kellySuggestion ?? p.kelly,
+          factors: p.factors,
+          refereeNote: p.refereeNote,
+          matchId: p.matchId,
+          matchName: `${p.homeTeam} vs ${p.awayTeam}`,
+          homeTeam: p.homeTeam,
+          awayTeam: p.awayTeam,
+          homeForm: p.homeForm ?? [],
+          awayForm: p.awayForm ?? [],
+          commenceTime: p.kickoff,
+          sport: p.sport,
+          league: p.league,
+          closing_odds: p.closing_odds,
+          clv: p.clv,
+        }));
+
+        setValueBets(allValue);
+        setLastUpdated(new Date());
+        setLoading(false);
+        return;
+      }
+
+      // Fallback: fetch from matches API
       const res = await fetch("/api/matches");
       if (!res.ok) return;
       const matches: MatchWithBets[] = await res.json();
@@ -345,6 +614,10 @@ export default function PicksPage() {
               ...b,
               matchId: match.id,
               matchName: `${match.homeTeam} vs ${match.awayTeam}`,
+              homeTeam: match.homeTeam,
+              awayTeam: match.awayTeam,
+              homeForm: match.homeForm ?? [],
+              awayForm: match.awayForm ?? [],
               commenceTime: match.commenceTime,
               sport: match.sport,
               league: match.league,
@@ -367,33 +640,42 @@ export default function PicksPage() {
     return () => clearInterval(interval);
   }, [fetchPicks]);
 
-  // Sort
+  // Sort picks
   const sorted = [...valueBets].sort((a, b) => {
     if (sortMode === "date") {
       const timeDiff = new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime();
       if (timeDiff !== 0) return timeDiff;
       return b.edge - a.edge;
     }
+    if (sortMode === "confidence") {
+      return b.confidence - a.confidence || b.edge - a.edge;
+    }
     return b.edge - a.edge;
   });
 
-  // Best pick (highest edge)
-  const bestPick = sorted.slice().sort((a, b) => b.edge - a.edge)[0] ?? null;
-  const restPicks = sorted.filter((b) => b !== bestPick || sorted.indexOf(b) > 0);
+  // Best Bets: top 3 by confidence × edge score
+  const bestBets = [...valueBets]
+    .sort((a, b) => (b.confidence * b.edge) - (a.confidence * a.edge))
+    .slice(0, 3);
 
-  const soccerBets = restPicks.filter((b) => b.sport === "soccer");
-  const nbaBets = restPicks.filter((b) => b.sport === "nba");
+  // Group into tiers
+  const locks = sorted.filter((b) => getConfidenceTier(b.confidence, b.edge) === "lock");
+  const strong = sorted.filter((b) => getConfidenceTier(b.confidence, b.edge) === "strong");
+  const speculative = sorted.filter((b) => getConfidenceTier(b.confidence, b.edge) === "speculative");
 
   return (
     <main style={{ minHeight: "100vh", background: "#080808" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px" }}>
         {/* Header */}
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "white", marginBottom: 5, letterSpacing: -0.3 }}>
             🎯 Value Picks
           </h1>
-          <div style={{ fontSize: 13, color: "#6b7280", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <span>Value bets with edge ≥ 5% vs market implied probability</span>
+          <div style={{
+            fontSize: 12, color: "#6b7280",
+            display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap",
+          }}>
+            <span>Curated bets ranked by model confidence and edge</span>
             {lastUpdated && (
               <span style={{ color: "#374151" }}>
                 Updated {lastUpdated.toLocaleTimeString("en-AU", { timeZone: "Australia/Sydney", hour12: true })}
@@ -403,8 +685,8 @@ export default function PicksPage() {
               onClick={fetchPicks}
               style={{
                 background: "#141419", border: "1px solid rgba(255,255,255,0.06)",
-                color: "#888899", borderRadius: 2, padding: "3px 10px",
-                fontSize: 12, cursor: "pointer", fontWeight: 400,
+                color: "#888899", borderRadius: 4, padding: "3px 10px",
+                fontSize: 11, cursor: "pointer",
               }}
             >
               ↻ Refresh
@@ -412,14 +694,38 @@ export default function PicksPage() {
           </div>
         </div>
 
-        {/* How are these scored? */}
-        <HowScoredExplainer />
+        {/* Tier legend */}
+        <div style={{
+          display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap",
+          padding: "10px 14px", background: "#141419", borderRadius: 6,
+          border: "1px solid rgba(255,255,255,0.06)",
+        }}>
+          {(["lock", "strong", "speculative"] as const).map((t) => {
+            const cfg = TIER_CONFIG[t];
+            const count = t === "lock" ? locks.length : t === "strong" ? strong.length : speculative.length;
+            return (
+              <div key={t} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: cfg.color,
+                  background: cfg.bg, padding: "2px 7px", borderRadius: 3,
+                  border: `1px solid ${cfg.border}`,
+                }}>
+                  {cfg.label}
+                </span>
+                <span style={{ fontSize: 11, color: "#4b5563" }}>{count}</span>
+              </div>
+            );
+          })}
+          <span style={{ fontSize: 11, color: "#374151", marginLeft: "auto" }}>
+            {valueBets.length} total picks
+          </span>
+        </div>
 
         {loading ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[1, 2, 3].map((i) => (
               <div key={i} style={{
-                background: "#141419", borderRadius: 2,
+                background: "#141419", borderRadius: 6,
                 border: "1px solid rgba(255,255,255,0.06)", padding: "14px 16px",
                 height: 120, animation: "pulse 1.5s infinite",
               }} />
@@ -427,7 +733,7 @@ export default function PicksPage() {
           </div>
         ) : valueBets.length === 0 ? (
           <div style={{
-            background: "#141419", borderRadius: 2,
+            background: "#141419", borderRadius: 6,
             border: "1px solid rgba(255,255,255,0.06)",
             padding: "50px 24px", textAlign: "center",
           }}>
@@ -441,94 +747,43 @@ export default function PicksPage() {
           </div>
         ) : (
           <>
-            {/* Hero: best pick */}
-            {bestPick && <HeroPick bet={bestPick} />}
+            {/* Best Bets Today hero */}
+            <BestBetsHero bets={bestBets} />
+
+            {/* Parlay Suggestions */}
+            <ParlaySuggestions parlays={parlays} />
 
             {/* Sort controls */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginBottom: 18, flexWrap: "wrap", gap: 10,
+            }}>
               <div style={{ fontSize: 13, color: "#6b7280" }}>
-                {restPicks.length} more value bet{restPicks.length !== 1 ? "s" : ""}
+                All picks by tier
               </div>
-              <div style={{ display: "flex", gap: 16 }}>
-                {(["date", "edge"] as const).map((mode) => (
+              <div style={{ display: "flex", gap: 14 }}>
+                {(["edge", "confidence", "date"] as const).map((mode) => (
                   <button
                     key={mode}
                     onClick={() => setSortMode(mode)}
                     style={{
-                      padding: "5px 0",
-                      border: "none",
-                      cursor: "pointer",
-                      fontWeight: sortMode === mode ? 500 : 400,
-                      fontSize: 12,
-                      background: "transparent",
+                      padding: "4px 0", border: "none", cursor: "pointer",
+                      fontWeight: sortMode === mode ? 600 : 400,
+                      fontSize: 11, background: "transparent",
                       color: sortMode === mode ? "#e8e0d0" : "#44444f",
                       transition: "color 0.15s",
                     }}
                   >
-                    {mode === "date" ? "📅 By Date" : "📈 By Edge"}
+                    {mode === "edge" ? "📈 By Edge" : mode === "confidence" ? "🎯 By Confidence" : "📅 By Date"}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Soccer section */}
-            {soccerBets.length > 0 && (
-              <div style={{ marginBottom: 32 }}>
-                <h2 style={{
-                  fontSize: 14, fontWeight: 700, color: "#9ca3af",
-                  textTransform: "uppercase", letterSpacing: 1.2,
-                  marginBottom: 14, display: "flex", alignItems: "center", gap: 8,
-                }}>
-                  ⚽ Soccer
-                  <span style={{ fontSize: 11, color: "#44444f", fontWeight: 400, fontFamily: "var(--font-dm-mono), monospace" }}>
-                    {soccerBets.length}
-                  </span>
-                </h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14 }}>
-                  {soccerBets.map((bet, i) => (
-                    <ValueBetCard key={`soccer-${i}`} bet={bet} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* NBA section */}
-            {nbaBets.length > 0 && (
-              <div style={{ marginBottom: 32 }}>
-                <h2 style={{
-                  fontSize: 14, fontWeight: 700, color: "#9ca3af",
-                  textTransform: "uppercase", letterSpacing: 1.2,
-                  marginBottom: 14, display: "flex", alignItems: "center", gap: 8,
-                }}>
-                  🏀 NBA
-                  <span style={{ fontSize: 11, color: "#44444f", fontWeight: 400, fontFamily: "var(--font-dm-mono), monospace" }}>
-                    {nbaBets.length}
-                  </span>
-                </h2>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14 }}>
-                  {nbaBets.map((bet, i) => (
-                    <ValueBetCard key={`nba-${i}`} bet={bet} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Summary footer */}
-            <div style={{
-              background: "#141419", borderRadius: 2,
-              border: "1px solid rgba(255,255,255,0.06)",
-              padding: "10px 14px",
-              display: "flex", gap: 24, flexWrap: "wrap",
-              fontSize: 13, color: "#6b7280",
-            }}>
-              <span>📊 {valueBets.length} total value bets</span>
-              <span>🔥 {valueBets.filter((b) => b.tier === "🔥 Strong").length} strong</span>
-              <span>✅ {valueBets.filter((b) => b.tier === "✅ Lean").length} lean</span>
-              <span>⚠️ {valueBets.filter((b) => b.tier === "⚠️ Marginal").length} marginal</span>
-              {valueBets.some((b) => b.refereeNote) && (
-                <span>⚖️ {new Set(valueBets.filter((b) => b.refereeNote).map((b) => b.refereeNote)).size} referee insights</span>
-              )}
-            </div>
+            {/* Tiered sections */}
+            <TierSection tier="lock" bets={locks} />
+            <TierSection tier="strong" bets={strong} />
+            <TierSection tier="speculative" bets={speculative} />
           </>
         )}
       </div>
