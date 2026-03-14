@@ -11,6 +11,8 @@ export interface FactorBreakdown {
   direction: "+" | "-" | "=";
 }
 
+export type MarketCategory = "result" | "goals" | "corners" | "cards" | "clean_sheet" | "first_half" | "other";
+
 export interface BetSuggestion {
   market: string;          // "Match Result" | "Over 2.5 Goals" | "BTTS" | etc
   pick: string;            // "Home Win" | "Over 2.5" | "Yes" | "Away -1.5" etc
@@ -25,10 +27,23 @@ export interface BetSuggestion {
   kellySuggestion: string; // "2.3% of bankroll" or "No edge (Kelly = 0)"
   factors?: FactorBreakdown[];
   refereeNote?: string;    // "⚖️ M. Oliver: strict on cards, 0.28 penalties/game"
+  marketCategory?: MarketCategory; // category for filtering/grouping
   // Best book fields (Feature 3)
   bestBook?: string;       // "Bet365", "BetWay", etc.
   bestOdds?: number;       // Best available odds across all books
   bestEdge?: number;       // Edge vs Pinnacle fair value at BEST odds
+}
+
+/** Derive market category from market string */
+export function getMarketCategory(market: string): MarketCategory {
+  const m = market.toLowerCase();
+  if (m.includes("match result") || m.includes("moneyline") || m.includes("double chance") || m.includes("winner")) return "result";
+  if (m.includes("first half")) return "first_half";
+  if (m.includes("total goals") || m.includes("over") || m.includes("under") || m.includes("btts") || m.includes("both teams")) return "goals";
+  if (m.includes("corner")) return "corners";
+  if (m.includes("card")) return "cards";
+  if (m.includes("clean sheet")) return "clean_sheet";
+  return "other";
 }
 
 // ─── Referee stats shape (mirrors lib/referees.ts — kept loose to avoid circular) ─
@@ -494,7 +509,7 @@ export function analyzeSoccer(match: {
     factors: makeFactors(-formAdv * 0.2, 0, 0, edgeBTTSNo),
   });
 
-  // ── 8. Double Chance: Home or Draw ──
+  // ── 8. Double Chance: Home or Draw (1X) ──
   if (match.drawOdds) {
     const modelDrawForDC = clamp(marketDraw * 0.40 + h2hDrawRate * 0.25 + (Math.abs(formAdv) < 0.15 ? 0.08 : 0.0));
     const modelHX = clamp(modelHome + modelDrawForDC);
@@ -513,59 +528,207 @@ export function analyzeSoccer(match: {
       kellySuggestion: formatKelly(modelHX, 1.45),
       refereeNote: refNote,
     });
+
+    // ── 8b. Double Chance: Away or Draw (X2) ──
+    const modelX2 = clamp(modelAway + modelDrawForDC);
+    const marketX2 = clamp(marketAway + (marketDraw || 0));
+    const edgeX2 = modelX2 - marketX2;
+    suggestions.push({
+      market: "Double Chance",
+      pick: "Away or Draw",
+      confidence: Math.round(modelX2 * 100),
+      edge: edgeX2,
+      modelProb: modelX2,
+      marketProb: marketX2,
+      value: edgeX2 >= 0.05,
+      tier: edgeTier(edgeX2),
+      reasoning: `Combined away win + draw probability. Safety net when backing the underdog.`,
+      kellySuggestion: formatKelly(modelX2, 1.45),
+      refereeNote: refNote,
+    });
+
+    // ── 8c. Double Chance: Either Team Wins (12) ──
+    const modelHA = clamp(modelHome + modelAway);
+    const marketHA = clamp(marketHome + marketAway);
+    const edgeHA = modelHA - marketHA;
+    suggestions.push({
+      market: "Double Chance",
+      pick: "Either Team Wins",
+      confidence: Math.round(modelHA * 100),
+      edge: edgeHA,
+      modelProb: modelHA,
+      marketProb: marketHA,
+      value: edgeHA >= 0.05,
+      tier: edgeTier(edgeHA),
+      reasoning: `No draw expected. Both teams in form to win — combined non-draw probability ${Math.round(modelHA * 100)}%.`,
+      kellySuggestion: formatKelly(modelHA, 1.20),
+      refereeNote: refNote,
+    });
   }
 
-  // ── 9. Corners ──
+  // ── 9. Over/Under 1.5 Goals (Poisson) ──
+  const modelOver15 = probOver(lambdaHome, lambdaAway, 1.5);
+  const marketOver15 = clamp(0.5 + (lambdaHome + lambdaAway - 1.5) * 0.12);
+  const edgeOver15 = modelOver15 - marketOver15;
+  suggestions.push({
+    market: "Total Goals",
+    pick: "Over 1.5 Goals",
+    confidence: Math.round(modelOver15 * 100),
+    edge: edgeOver15,
+    modelProb: modelOver15,
+    marketProb: marketOver15,
+    value: edgeOver15 >= 0.05,
+    tier: edgeTier(edgeOver15),
+    reasoning: `Poisson model: ${Math.round(modelOver15 * 100)}% chance of 2+ goals. λ total: ${(lambdaHome + lambdaAway).toFixed(2)}.${weatherNote}`,
+    kellySuggestion: formatKelly(modelOver15, 1.40),
+    factors: makeFactors((lambdaHome + lambdaAway - 1.5) * 0.3, 0, 0, edgeOver15),
+  });
+
+  // ── 10. Over/Under 3.5 Goals (Poisson) ──
+  const modelOver35 = probOver(lambdaHome, lambdaAway, 3.5);
+  const marketOver35 = clamp(0.5 + (lambdaHome + lambdaAway - 3.5) * 0.06);
+  const edgeOver35 = modelOver35 - marketOver35;
+  suggestions.push({
+    market: "Total Goals",
+    pick: "Over 3.5 Goals",
+    confidence: Math.round(modelOver35 * 100),
+    edge: edgeOver35,
+    modelProb: modelOver35,
+    marketProb: marketOver35,
+    value: edgeOver35 >= 0.05,
+    tier: edgeTier(edgeOver35),
+    reasoning: `Poisson model: ${Math.round(modelOver35 * 100)}% chance of 4+ goals. High-scoring fixture expected when λ total ≥ 3.0.${weatherNote}`,
+    kellySuggestion: formatKelly(modelOver35, 2.20),
+    factors: makeFactors((lambdaHome + lambdaAway - 3.5) * 0.15, 0, 0, edgeOver35),
+  });
+
+  const modelUnder35 = 1 - modelOver35;
+  const edgeUnder35 = modelUnder35 - (1 - marketOver35);
+  suggestions.push({
+    market: "Total Goals",
+    pick: "Under 3.5 Goals",
+    confidence: Math.round(modelUnder35 * 100),
+    edge: edgeUnder35,
+    modelProb: modelUnder35,
+    marketProb: 1 - marketOver35,
+    value: edgeUnder35 >= 0.05,
+    tier: edgeTier(edgeUnder35),
+    reasoning: `${Math.round(modelUnder35 * 100)}% chance of 3 or fewer goals. Defensive match expected.`,
+    kellySuggestion: formatKelly(modelUnder35, 1.50),
+    factors: makeFactors(-(lambdaHome + lambdaAway - 3.0) * 0.15, 0, 0, edgeUnder35),
+  });
+
+  // ── 11. Clean Sheet — Home ──
+  const pHomeCS = poisson(lambdaAway, 0); // P(away scores 0)
+  const modelHomeCS = clamp(pHomeCS);
+  const marketHomeCS = clamp(match.cleanSheetHome > 0 ? match.cleanSheetHome : pHomeCS * 0.95);
+  const edgeHomeCS = modelHomeCS - marketHomeCS;
+  suggestions.push({
+    market: "Clean Sheet",
+    pick: `${match.homeTeam} Clean Sheet`,
+    confidence: Math.round(modelHomeCS * 100),
+    edge: edgeHomeCS,
+    modelProb: modelHomeCS,
+    marketProb: marketHomeCS,
+    value: edgeHomeCS >= 0.05,
+    tier: edgeTier(edgeHomeCS),
+    reasoning: `P(${match.awayTeam} scores 0) = Poisson(0, ${lambdaAway.toFixed(2)}) = ${Math.round(pHomeCS * 100)}%. ${pHomeCS >= 0.35 ? "Solid defensive record." : "Opponent usually finds the net."}`,
+    kellySuggestion: formatKelly(modelHomeCS, 2.50),
+  });
+
+  // ── 12. Clean Sheet — Away ──
+  const pAwayCS = poisson(lambdaHome, 0); // P(home scores 0)
+  const modelAwayCS = clamp(pAwayCS);
+  const marketAwayCS = clamp(match.cleanSheetAway > 0 ? match.cleanSheetAway : pAwayCS * 0.95);
+  const edgeAwayCS = modelAwayCS - marketAwayCS;
+  suggestions.push({
+    market: "Clean Sheet",
+    pick: `${match.awayTeam} Clean Sheet`,
+    confidence: Math.round(modelAwayCS * 100),
+    edge: edgeAwayCS,
+    modelProb: modelAwayCS,
+    marketProb: marketAwayCS,
+    value: edgeAwayCS >= 0.05,
+    tier: edgeTier(edgeAwayCS),
+    reasoning: `P(${match.homeTeam} scores 0) = Poisson(0, ${lambdaHome.toFixed(2)}) = ${Math.round(pAwayCS * 100)}%. ${pAwayCS >= 0.30 ? "Strong away defence." : "Home team rarely blanked."}`,
+    kellySuggestion: formatKelly(modelAwayCS, 3.00),
+  });
+
+  // ── 13. First Half Over/Under 1.5 Goals ──
+  // Approximate: ~45% of goals scored in first half historically
+  const lambdaHomeH1 = lambdaHome * 0.45;
+  const lambdaAwayH1 = lambdaAway * 0.45;
+  const modelOverH1_15 = probOver(lambdaHomeH1, lambdaAwayH1, 1.5);
+  const marketOverH1_15 = clamp(0.5 + (lambdaHomeH1 + lambdaAwayH1 - 1.5) * 0.10);
+  const edgeOverH1_15 = modelOverH1_15 - marketOverH1_15;
+  suggestions.push({
+    market: "First Half Goals",
+    pick: "1H Over 1.5 Goals",
+    confidence: Math.round(modelOverH1_15 * 100),
+    edge: edgeOverH1_15,
+    modelProb: modelOverH1_15,
+    marketProb: marketOverH1_15,
+    value: edgeOverH1_15 >= 0.05,
+    tier: edgeTier(edgeOverH1_15),
+    reasoning: `First half λ: ${(lambdaHomeH1 + lambdaAwayH1).toFixed(2)} (45% of full-time xG). ${Math.round(modelOverH1_15 * 100)}% chance of 2+ first half goals.`,
+    kellySuggestion: formatKelly(modelOverH1_15, 2.40),
+  });
+
+  // ── 14. Corners Over/Under 9.5 & 10.5 ──
   const cornersHome = match.cornersAvgHome ?? 0;
   const cornersAway = match.cornersAvgAway ?? 0;
   if (cornersHome > 0 && cornersAway > 0) {
     const totalCornersAvg = (cornersHome + cornersAway) * (1 + weatherCornersAdj);
-    const line = 9.5;
-    const overProb = clamp(0.5 + (totalCornersAvg - line) * 0.04);
-    const edgeCorners = overProb - 0.50;
     const cornersWeatherNote = match.weather && weatherCornersAdj !== 0
       ? ` ${match.weather.icon} Weather adj: ${(weatherCornersAdj * 100).toFixed(0)}%.`
       : "";
-    suggestions.push({
-      market: "Total Corners",
-      pick: `Over ${line}`,
-      confidence: Math.round(overProb * 100),
-      edge: edgeCorners,
-      modelProb: overProb,
-      marketProb: 0.50,
-      value: edgeCorners >= 0.05,
-      tier: edgeTier(edgeCorners),
-      reasoning: `Combined corners avg: ${totalCornersAvg.toFixed(1)}/game (H: ${cornersHome.toFixed(1)}, A: ${cornersAway.toFixed(1)}). Line: ${line}.${cornersWeatherNote}`,
-      kellySuggestion: formatKelly(overProb, 1.90),
-    });
+
+    for (const cLine of [9.5, 10.5]) {
+      const overProb = clamp(0.5 + (totalCornersAvg - cLine) * 0.04);
+      const edgeCorners = overProb - 0.50;
+      suggestions.push({
+        market: "Total Corners",
+        pick: `Over ${cLine}`,
+        confidence: Math.round(overProb * 100),
+        edge: edgeCorners,
+        modelProb: overProb,
+        marketProb: 0.50,
+        value: edgeCorners >= 0.05,
+        tier: edgeTier(edgeCorners),
+        reasoning: `Combined corners avg: ${totalCornersAvg.toFixed(1)}/game (H: ${cornersHome.toFixed(1)}, A: ${cornersAway.toFixed(1)}). Line: ${cLine}.${cornersWeatherNote}`,
+        kellySuggestion: formatKelly(overProb, cLine === 9.5 ? 1.90 : 2.10),
+      });
+    }
   }
 
-  // ── 10. Cards (with referee intelligence boost) ──
+  // ── 15. Cards Over/Under 3.5 & 4.5 (with referee intelligence) ──
   const cardsAvgHome = (match as { cardsAvgHome?: number }).cardsAvgHome ?? 0;
   const cardsAvgAway = (match as { cardsAvgAway?: number }).cardsAvgAway ?? 0;
   if (cardsAvgHome > 0) {
     const totalCardsAvg = cardsAvgHome + cardsAvgAway;
-    const cardLine = 3.5;
-    const cardOverProb = clamp(0.5 + (totalCardsAvg - cardLine) * 0.08 + cardBoost);
-    const edgeCards = cardOverProb - 0.5;
     const refCardNote = match.refereeStats?.cardStyle === "strict"
       ? ` Referee ${match.referee ?? ""} is strict (+7% boost applied).`
       : match.refereeStats?.cardStyle === "lenient"
       ? ` Referee ${match.referee ?? ""} is lenient (-5% reduction applied).`
       : "";
-    suggestions.push({
-      market: "Total Cards",
-      pick: `Over ${cardLine}`,
-      confidence: Math.round(cardOverProb * 100),
-      edge: edgeCards,
-      modelProb: cardOverProb,
-      marketProb: 0.5,
-      value: edgeCards >= 0.05,
-      tier: edgeTier(edgeCards),
-      reasoning: `Cards avg: ${cardsAvgHome.toFixed(1)}/game home, ${cardsAvgAway.toFixed(1)}/game away. Total: ${totalCardsAvg.toFixed(1)}.${refCardNote}`,
-      kellySuggestion: formatKelly(cardOverProb, 1.90),
-      refereeNote: refNote,
-    });
+
+    for (const cardLine of [3.5, 4.5]) {
+      const cardOverProb = clamp(0.5 + (totalCardsAvg - cardLine) * 0.08 + cardBoost);
+      const edgeCards = cardOverProb - 0.5;
+      suggestions.push({
+        market: "Total Cards",
+        pick: `Over ${cardLine}`,
+        confidence: Math.round(cardOverProb * 100),
+        edge: edgeCards,
+        modelProb: cardOverProb,
+        marketProb: 0.5,
+        value: edgeCards >= 0.05,
+        tier: edgeTier(edgeCards),
+        reasoning: `Cards avg: ${cardsAvgHome.toFixed(1)}/game home, ${cardsAvgAway.toFixed(1)}/game away. Total: ${totalCardsAvg.toFixed(1)}. Line: ${cardLine}.${refCardNote}`,
+        kellySuggestion: formatKelly(cardOverProb, cardLine === 3.5 ? 1.90 : 2.20),
+        refereeNote: refNote,
+      });
+    }
   }
 
   // Sort: value bets first, then by edge descending

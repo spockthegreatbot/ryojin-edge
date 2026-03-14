@@ -59,7 +59,9 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: Request) {
-  const { origin } = new URL(request.url);
+  const url = new URL(request.url);
+  const { origin } = url;
+  const marketFilter = url.searchParams.get("market"); // e.g. "corners", "cards", "goals", "result", "clean_sheet", "first_half", "all"
 
   // Fetch from internal /api/matches to reuse existing data pipeline
   const matchesRes = await fetch(`${origin}/api/matches`, {
@@ -162,8 +164,17 @@ export async function GET(request: Request) {
     console.error("[picks] CS2 merge failed:", e);
   }
 
+  // Apply market category filter if requested
+  const { getMarketCategory } = await import("@/lib/bet-analyzer");
+  let filteredPicks = picks;
+  if (marketFilter && marketFilter !== "all") {
+    filteredPicks = picks.filter(p => getMarketCategory(p.market) === marketFilter);
+  }
+
   // Sort by edge descending — highest value first
-  picks.sort((a, b) => b.edge - a.edge);
+  filteredPicks.sort((a, b) => b.edge - a.edge);
+  // Replace picks reference for downstream code
+  const finalPicks = filteredPicks;
 
   // Fire alerts for high-edge picks (non-blocking)
   picks.filter(p => p.edge >= 0.15 && p.odds !== null).forEach(p => sendPickAlert({ ...p, odds: p.odds! }).catch(() => {}));
@@ -188,6 +199,26 @@ export async function GET(request: Request) {
           )
           ON CONFLICT (match_id, market, pick) DO NOTHING
         `;
+      }
+
+      // ── Also record to pick_results table for results tracking ──
+      for (const pick of picks) {
+        if (!pick.edge || pick.edge < 0.05) continue; // Only track value bets
+        await sql`
+          INSERT INTO pick_results (
+            match_id, match_name, league, sport, kickoff,
+            market, pick, model_prob, market_prob, edge, tier, odds, result
+          ) VALUES (
+            ${pick.matchId},
+            ${pick.homeTeam + " vs " + pick.awayTeam},
+            ${pick.league}, ${pick.sport}, ${pick.kickoff},
+            ${pick.market}, ${pick.pick},
+            ${pick.modelProb ?? null}, ${pick.marketProb ?? null},
+            ${pick.edge}, ${pick.tier}, ${pick.odds ?? null},
+            'pending'
+          )
+          ON CONFLICT (match_id, market, pick) DO NOTHING
+        `.catch(() => { /* pick_results table may not exist yet — non-fatal */ });
       }
 
       // Merge closing_odds and clv from DB into picks response
@@ -216,10 +247,10 @@ export async function GET(request: Request) {
     }
   }
 
-  // Build summary
-  const strong = picks.filter((p) => p.tier === "🔥 Strong").length;
-  const lean = picks.filter((p) => p.tier === "✅ Lean").length;
-  const marginal = picks.filter((p) => p.tier === "⚠️ Marginal").length;
+  // Build summary (from filtered picks for response)
+  const strong = finalPicks.filter((p) => p.tier === "🔥 Strong").length;
+  const lean = finalPicks.filter((p) => p.tier === "✅ Lean").length;
+  const marginal = finalPicks.filter((p) => p.tier === "⚠️ Marginal").length;
 
   // Build top 3 parlays for Gordon multi-leg execution
   const topParlays = buildParlays(
@@ -234,10 +265,10 @@ export async function GET(request: Request) {
 
   const payload = {
     generated: new Date().toISOString(),
-    picks,
+    picks: finalPicks,
     parlays: topParlays,
     summary: {
-      total: picks.length,
+      total: finalPicks.length,
       strong,
       lean,
       marginal,

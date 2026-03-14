@@ -39,6 +39,7 @@ export default function NavBar() {
           { href: "/", label: "Matches" },
           { href: "/picks", label: "Picks" },
           { href: "/parlays", label: "Parlays" },
+          { href: "/results", label: "Results" },
           { href: "/stats", label: "Stats" },
           { href: "/tracker", label: "Tracker" },
         ].map(({ href, label }) => (

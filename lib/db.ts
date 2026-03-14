@@ -32,6 +32,31 @@ export async function initSchema() {
     )
   `;
 
+  // Pick results tracking table
+  await sql`
+    CREATE TABLE IF NOT EXISTS pick_results (
+      id SERIAL PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      match_name TEXT NOT NULL,
+      league TEXT,
+      sport TEXT DEFAULT 'soccer',
+      kickoff TIMESTAMPTZ,
+      market TEXT NOT NULL,
+      pick TEXT NOT NULL,
+      model_prob REAL,
+      market_prob REAL,
+      edge REAL,
+      tier TEXT,
+      odds REAL,
+      result TEXT DEFAULT 'pending',
+      actual_score TEXT,
+      actual_value TEXT,
+      settled_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(match_id, market, pick)
+    )
+  `;
+
   // CLV tracking columns
   try {
     await sql`ALTER TABLE picks ADD COLUMN IF NOT EXISTS opening_odds FLOAT`;

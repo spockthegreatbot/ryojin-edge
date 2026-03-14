@@ -51,12 +51,36 @@ export async function GET() {
       const market = pick.market.toLowerCase();
       const pickVal = pick.pick.toLowerCase();
 
-      if (market.includes('total goals') || market.includes('over/under') || market.includes('over 2.5') || market.includes('under 2.5')) {
+      if (market.includes('first half')) {
+        // First half goals — need HT score from API
+        const htHome = fixture.score?.halftime?.home ?? null;
+        const htAway = fixture.score?.halftime?.away ?? null;
+        if (htHome !== null && htAway !== null) {
+          const htTotal = htHome + htAway;
+          const lineMatch = pickVal.match(/(\d+\.?\d*)/);
+          const line = lineMatch ? parseFloat(lineMatch[1]) : 1.5;
+          if (pickVal.includes('over')) outcome = htTotal > line ? 'win' : htTotal === line ? 'push' : 'loss';
+          else outcome = htTotal < line ? 'win' : htTotal === line ? 'push' : 'loss';
+        } else {
+          outcome = 'void'; // HT score unavailable
+        }
+      } else if (market.includes('total goals') || market.includes('over/under') || market.includes('over 2.5') || market.includes('under 2.5')) {
         // Extract line from pick value (e.g. "Over 2.5", "Under 3.5")
         const lineMatch = pickVal.match(/(\d+\.?\d*)/);
         const line = lineMatch ? parseFloat(lineMatch[1]) : 2.5;
         if (pickVal.includes('over')) outcome = totalGoals > line ? 'win' : totalGoals === line ? 'push' : 'loss';
         else outcome = totalGoals < line ? 'win' : totalGoals === line ? 'push' : 'loss';
+      } else if (market.includes('double chance')) {
+        const homeWin = homeGoals > awayGoals;
+        const awayWin = awayGoals > homeGoals;
+        const draw = homeGoals === awayGoals;
+        if (pickVal.includes('home or draw') || pickVal.includes('1x')) {
+          outcome = homeWin || draw ? 'win' : 'loss';
+        } else if (pickVal.includes('away or draw') || pickVal.includes('x2')) {
+          outcome = awayWin || draw ? 'win' : 'loss';
+        } else if (pickVal.includes('either team wins') || pickVal.includes('12')) {
+          outcome = homeWin || awayWin ? 'win' : 'loss';
+        }
       } else if (market.includes('match result') || market.includes('1x2') || market.includes('winner')) {
         if (pickVal.includes('home') || pickVal.includes(pick.home_team.toLowerCase())) {
           outcome = homeGoals > awayGoals ? 'win' : 'loss';
@@ -68,6 +92,14 @@ export async function GET() {
       } else if (market.includes('btts') || market.includes('both teams')) {
         const bttsResult = homeGoals > 0 && awayGoals > 0;
         outcome = pickVal.includes('yes') ? (bttsResult ? 'win' : 'loss') : (!bttsResult ? 'win' : 'loss');
+      } else if (market.includes('clean sheet')) {
+        if (pickVal.includes(pick.home_team.toLowerCase())) {
+          // Home clean sheet = away scored 0
+          outcome = awayGoals === 0 ? 'win' : 'loss';
+        } else if (pickVal.includes(pick.away_team.toLowerCase())) {
+          // Away clean sheet = home scored 0
+          outcome = homeGoals === 0 ? 'win' : 'loss';
+        }
       }
 
       await sql`
