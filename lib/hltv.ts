@@ -242,6 +242,65 @@ function parseHLTVRankings(html: string): CS2Team[] | null {
   }
 }
 
+// ─── Live scraper data reader ────────────────────────────────────────────────
+import { readFileSync, statSync } from "fs";
+
+const SCRAPED_DATA_PATH = "/tmp/hltv-data.json";
+const SCRAPE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface ScrapedData {
+  rankings: { rank: number; name: string; points: number }[];
+  matches: { team1: string; team2: string; event: string; time: string; format: string; stars: number }[];
+  scraped_at: string;
+}
+
+function loadScrapedData(): ScrapedData | null {
+  try {
+    const stat = statSync(SCRAPED_DATA_PATH);
+    const ageMs = Date.now() - stat.mtimeMs;
+    if (ageMs > SCRAPE_MAX_AGE_MS) {
+      console.log(`[hltv] Scraped data is ${Math.round(ageMs / 3600000)}h old — stale, using hardcoded`);
+      return null;
+    }
+    const raw = readFileSync(SCRAPED_DATA_PATH, "utf-8");
+    const data = JSON.parse(raw) as ScrapedData;
+    if (!data.rankings?.length) return null;
+    console.log(`[hltv] Loaded scraped data (${data.rankings.length} teams, ${data.matches?.length ?? 0} matches)`);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function scrapedRankingsToTeams(scraped: ScrapedData): CS2Team[] {
+  return scraped.rankings.map((r) => ({
+    name: r.name,
+    rank: r.rank,
+    points: r.points,
+  }));
+}
+
+function scrapedMatchesToCS2(scraped: ScrapedData): CS2Match[] {
+  return scraped.matches.map((m, i) => {
+    const fmt = (m.format || "BO3").toUpperCase() as "BO1" | "BO3" | "BO5";
+    const validFormat = ["BO1", "BO3", "BO5"].includes(fmt) ? fmt : "BO3" as const;
+    // Look up ranks from scraped rankings
+    const r1 = scraped.rankings.find((r) => r.name.toLowerCase() === m.team1.toLowerCase());
+    const r2 = scraped.rankings.find((r) => r.name.toLowerCase() === m.team2.toLowerCase());
+    return {
+      id: `hltv-${i}`,
+      team1: m.team1,
+      team2: m.team2,
+      team1Rank: r1?.rank ?? 99,
+      team2Rank: r2?.rank ?? 99,
+      event: m.event,
+      date: m.time ? new Date(m.time.replace(" ", "T") + ":00Z").toISOString() : new Date().toISOString(),
+      format: validFormat,
+      isLan: m.stars >= 4, // high-star matches are typically LAN
+    };
+  });
+}
+
 // ─── Cache ───────────────────────────────────────────────────────────────────
 
 let rankingsCache: { data: CS2Team[]; fetchedAt: number } | null = null;
@@ -257,7 +316,18 @@ export async function getCS2Rankings(): Promise<CS2Team[]> {
     return rankingsCache.data;
   }
 
-  // Try live HLTV scrape
+  // Try scraped data first (from scripts/scrape-hltv.mjs cron)
+  const scraped = loadScrapedData();
+  if (scraped) {
+    const teams = scrapedRankingsToTeams(scraped);
+    if (teams.length >= 10) {
+      rankingsCache = { data: teams, fetchedAt: Date.now() };
+      console.log(`[hltv] Using scraped rankings: ${teams.length} teams`);
+      return teams;
+    }
+  }
+
+  // Try live HTTP fetch (often blocked by Cloudflare)
   const html = await tryFetchHLTV("https://www.hltv.org/ranking/teams");
   if (html) {
     const parsed = parseHLTVRankings(html);
@@ -279,8 +349,18 @@ export async function getCS2Matches(): Promise<CS2Match[]> {
     return matchesCache.data;
   }
 
-  // For v1, use generated upcoming matches
-  // TODO: Try Liquipedia API or HLTV scraping for live match data
+  // Try scraped data first
+  const scraped = loadScrapedData();
+  if (scraped && scraped.matches?.length > 0) {
+    const matches = scrapedMatchesToCS2(scraped);
+    if (matches.length > 0) {
+      matchesCache = { data: matches, fetchedAt: Date.now() };
+      console.log(`[hltv] Using scraped matches: ${matches.length}`);
+      return matches;
+    }
+  }
+
+  // Fallback to generated upcoming matches
   const matches = generateUpcomingMatches();
   matchesCache = { data: matches, fetchedAt: Date.now() };
   return matches;
