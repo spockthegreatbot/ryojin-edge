@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MatchData } from "@/lib/mock-data";
 import { BetSuggestion, FactorBreakdown } from "@/lib/bet-analyzer";
 import { Parlay } from "@/lib/parlays";
+import CS2Picks from "@/app/components/CS2Picks";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ interface ValueBet extends BetSuggestion {
   homeForm: string[];
   awayForm: string[];
   commenceTime: string;
-  sport: "soccer" | "nba" | "nrl" | "ufc";
+  sport: "soccer" | "nba" | "nrl" | "ufc" | "cs2";
   league: string;
   closing_odds?: number | null;
   clv?: number | null;
@@ -549,12 +550,15 @@ function TierSection({ tier, bets }: { tier: ConfidenceTier; bets: ValueBet[] })
 
 // ── Main Page ───────────────────────────────────────────────────────────────
 
+type SportTab = "sports" | "cs2";
+
 export default function PicksPage() {
   const [valueBets, setValueBets] = useState<ValueBet[]>([]);
   const [parlays, setParlays] = useState<Parlay[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("edge");
+  const [activeTab, setActiveTab] = useState<SportTab>("sports");
 
   const fetchPicks = useCallback(async () => {
     try {
@@ -666,6 +670,40 @@ export default function PicksPage() {
   return (
     <main style={{ minHeight: "100vh", background: "#080808" }}>
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 16px" }}>
+        {/* Sport Tabs */}
+        <div style={{
+          display: "flex", gap: 0, marginBottom: 20,
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+        }}>
+          {([
+            { id: "sports" as const, label: "⚽ Sports", icon: "🏀" },
+            { id: "cs2" as const, label: "🎮 CS2", icon: "" },
+          ]).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: "10px 20px",
+                background: "transparent",
+                border: "none",
+                borderBottom: activeTab === tab.id ? "2px solid #E8C96E" : "2px solid transparent",
+                color: activeTab === tab.id ? "#e8e0d0" : "#44444f",
+                fontSize: 14,
+                fontWeight: activeTab === tab.id ? 700 : 400,
+                cursor: "pointer",
+                transition: "color 0.15s, border-color 0.15s",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* CS2 Tab */}
+        {activeTab === "cs2" && <CS2Picks />}
+
+        {/* Sports Tab */}
+        {activeTab === "sports" && <>
         {/* Header */}
         <div style={{ marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "white", marginBottom: 5, letterSpacing: -0.3 }}>
@@ -786,6 +824,7 @@ export default function PicksPage() {
             <TierSection tier="speculative" bets={speculative} />
           </>
         )}
+        </>}
       </div>
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }

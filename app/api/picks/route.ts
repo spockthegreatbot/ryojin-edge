@@ -4,6 +4,8 @@ import { MatchData } from "@/lib/mock-data";
 import { getDb } from "@/lib/db";
 import { buildParlays } from "@/lib/parlays";
 import { sendPickAlert } from "@/lib/alerts";
+import { getCS2Rankings, getCS2Matches, getCS2Results } from "@/lib/hltv";
+import { predictAllCS2Matches } from "@/lib/cs2-elo";
 
 interface MatchWithBets extends MatchData {
   bets: BetSuggestion[];
@@ -122,6 +124,42 @@ export async function GET(request: Request) {
         eloGap,
       });
     }
+  }
+
+  // ── Merge CS2 picks ──────────────────────────────────────────────────────
+  try {
+    const [cs2Rankings, cs2Matches, cs2Results] = await Promise.all([
+      getCS2Rankings(),
+      getCS2Matches(),
+      getCS2Results(),
+    ]);
+    const cs2Predictions = predictAllCS2Matches(cs2Matches, cs2Rankings, cs2Results);
+    for (const pred of cs2Predictions) {
+      picks.push({
+        matchId: pred.matchId,
+        homeTeam: pred.team1,
+        awayTeam: pred.team2,
+        match: `${pred.team1} vs ${pred.team2}`,
+        league: pred.event,
+        sport: "cs2",
+        kickoff: pred.date,
+        market: "Match Winner",
+        pick: pred.pick,
+        edge: pred.edge,
+        edgePct: `+${Math.round(pred.edge * 100)}%`,
+        confidence: pred.confidence,
+        modelProb: pred.pickProb,
+        marketProb: pred.marketProb ?? 0.5,
+        odds: pred.marketOdds,
+        tier: pred.tier,
+        reasoning: pred.reasoning,
+        kellySuggestion: "No market odds",
+        homeForm: pred.team1Form,
+        awayForm: pred.team2Form,
+      });
+    }
+  } catch (e) {
+    console.error("[picks] CS2 merge failed:", e);
   }
 
   // Sort by edge descending — highest value first
